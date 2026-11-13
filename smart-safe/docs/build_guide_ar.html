@@ -1,0 +1,878 @@
+<title>بناء الخزنة الذكية</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Cairo:wght@600;700&display=swap">
+<style>
+/* Layout: a step rail on the left, one bench card per step with the wiring picture on top, the instructions under it. */
+:root{
+  --bg:#f3f5f1; --surface:#ffffff; --sunk:#e8ece6; --fg:#1b221e; --muted:#5d6a62; --line:#cdd5cf;
+  --accent:#1f6f4a; --accent-soft:#dcefe4; --copper:#b8692c; --copper-soft:#f6e6d8;
+  --chip:#26302b; --chip-fg:#e9efe9; --chip-dim:#8d9a92;
+  --w-pos:#d23c3c; --w-neg:#2b2b2b; --w-blue:#2d6cd2; --w-yellow:#c79300; --w-orange:#e0731a;
+  --w-purple:#8650c8; --w-green:#239455; --w-cyan:#1594ab; --w-pink:#d0478f; --w-brown:#8a5a33;
+  --ok:#1f7a4d; --warn:#a85d00;
+  --f-head:"Cairo","IBM Plex Sans Arabic",system-ui,sans-serif; --f-body:"IBM Plex Sans Arabic",system-ui,sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121815; --surface:#1a221e; --sunk:#222c27; --fg:#e4ebe6; --muted:#9aa8a0; --line:#33403a;
+  --accent:#5cc28f; --accent-soft:#1d3a2b; --copper:#e2955a; --copper-soft:#3a2a1d;
+  --chip:#0b0f0d; --chip-fg:#e9efe9; --chip-dim:#6f7d75;
+  --w-pos:#f06464; --w-neg:#b9c2bd; --w-blue:#5f95f0; --w-yellow:#e7b52a; --w-orange:#f2914a;
+  --w-purple:#a982e6; --w-green:#4cc282; --w-cyan:#3fbfd6; --w-pink:#ec72b0; --w-brown:#c08a5c;
+  --ok:#5cc28f; --warn:#f0a548; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121815; --surface:#1a221e; --sunk:#222c27; --fg:#e4ebe6; --muted:#9aa8a0; --line:#33403a;
+  --accent:#5cc28f; --accent-soft:#1d3a2b; --copper:#e2955a; --copper-soft:#3a2a1d;
+  --chip:#0b0f0d; --chip-fg:#e9efe9; --chip-dim:#6f7d75;
+  --w-pos:#f06464; --w-neg:#b9c2bd; --w-blue:#5f95f0; --w-yellow:#e7b52a; --w-orange:#f2914a;
+  --w-purple:#a982e6; --w-green:#4cc282; --w-cyan:#3fbfd6; --w-pink:#ec72b0; --w-brown:#c08a5c;
+  --ok:#5cc28f; --warn:#f0a548; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.wrap{max-width:1180px;margin:0 auto;display:grid;grid-template-columns:250px minmax(0,1fr);gap:24px;align-items:start}
+header.top{max-width:1180px;margin:0 auto 18px;display:flex;flex-wrap:wrap;gap:8px 20px;align-items:baseline;justify-content:space-between}
+h1{font-family:var(--f-head);font-size:28px;margin:0;letter-spacing:-.01em}
+.sub{color:var(--muted);margin:0}
+.progress{font-family:var(--f-mono);font-size:13px;color:var(--muted)}
+.progress b{color:var(--accent)}
+nav.rail{position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px);display:flex;flex-direction:column;gap:2px}
+nav.rail button{all:unset;cursor:pointer;display:grid;grid-template-columns:28px 1fr;gap:8px;align-items:center;padding:7px 10px;border-radius:8px;color:var(--fg);font-size:14px}
+nav.rail button:hover{background:var(--sunk)}
+nav.rail button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+nav.rail button[aria-current="step"]{background:var(--accent-soft);font-weight:600}
+.dot{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-family:var(--f-mono);font-size:12px;border:1.5px solid var(--line);color:var(--muted);background:var(--surface)}
+button[aria-current="step"] .dot{border-color:var(--accent);color:var(--accent)}
+.done .dot{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.phase{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:12px 10px 4px}
+main{min-width:0;display:flex;flex-direction:column;gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px}
+.eyebrow{font-family:var(--f-mono);font-size:12px;color:var(--copper);letter-spacing:.04em}
+h2{font-family:var(--f-head);font-size:24px;margin:2px 0 6px;text-wrap:balance}
+.lead{margin:0;color:var(--muted);max-width:68ch}
+.diagram{overflow-x:auto;margin:14px -6px 0;padding:0 6px}
+.diagram{direction:ltr} .diagram svg{display:block;min-width:640px;width:100%;height:auto}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:var(--muted);margin-top:8px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:22px;height:3px;border-radius:2px;display:inline-block}
+.cols{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px}
+h3{font-family:var(--f-head);font-size:16px;margin:0 0 8px}
+ol.do{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:7px}
+ol.do li{padding-left:4px} [dir=rtl] ol.do{padding-left:0;padding-right:22px} [dir=rtl] .fix ul{padding-left:0;padding-right:20px} .hex textarea{direction:ltr}
+.check{background:var(--accent-soft);border-radius:12px;padding:14px 16px}
+.check p{margin:0}
+.fix{margin-top:12px;background:var(--copper-soft);border-radius:12px;padding:12px 16px}
+.fix summary{cursor:pointer;font-weight:600}
+.fix ul{margin:8px 0 0;padding-left:20px}
+code,.mono{font-family:var(--f-mono);font-size:.9em}
+code{background:var(--sunk);padding:1px 5px;border-radius:4px}
+.parts{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;margin:0;padding:0;list-style:none}
+.parts li{background:var(--sunk);border-radius:10px;padding:8px 12px;font-size:14px}
+.parts li b{display:block;font-weight:600}
+.hex{margin-top:12px;border:1px dashed var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.hex textarea{width:100%;height:84px;font-family:var(--f-mono);font-size:11px;background:var(--sunk);color:var(--fg);border:0;border-radius:8px;padding:8px;resize:vertical}
+.btn{all:unset;cursor:pointer;padding:10px 16px;border-radius:10px;font-weight:600;font-size:14px;text-align:center}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn.primary{background:var(--accent);color:var(--surface)}
+.btn.ghost{background:var(--sunk);color:var(--fg)}
+.btn[disabled]{opacity:.4;pointer-events:none}
+.foot{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.foot label{display:inline-flex;gap:8px;align-items:center;cursor:pointer;font-weight:500}
+.foot input{width:18px;height:18px;accent-color:var(--accent)}
+.warn{color:var(--warn);font-weight:600}
+/* svg */
+.chip{fill:var(--chip)} .chip-notch{fill:var(--bg)}
+.pinlbl{font-family:var(--f-mono);font-size:11px;fill:var(--chip-dim)}
+.pinlbl.used{fill:var(--chip-fg);font-weight:600}
+.pinnum{font-family:var(--f-mono);font-size:10px;fill:var(--chip-dim)}
+.stub{stroke:var(--chip-dim);stroke-width:3}
+.stub.used{stroke:var(--chip-fg)}
+.tag{font-family:var(--f-mono);font-size:10px;font-weight:600}
+.tag-pos{fill:var(--w-pos)} .tag-neg{fill:var(--w-neg)}
+.tagbg-pos{fill:var(--w-pos);opacity:.18} .tagbg-neg{fill:var(--w-neg);opacity:.18}
+.box{fill:var(--surface);stroke:var(--line);stroke-width:1.5}
+.box.new{stroke:var(--copper);stroke-width:2.2;fill:var(--copper-soft)}
+.boxname{font-family:var(--f-head);font-size:13px;font-weight:700;fill:var(--fg)}
+.boxsub{font-family:var(--f-body);font-size:10.5px;fill:var(--muted)}
+.portlbl{font-family:var(--f-body);font-size:10.5px;fill:var(--fg)}
+.wire{fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.wire.old{opacity:.28}
+.wire.new{stroke-width:3.6;stroke-dasharray:9 5;animation:flow 1.1s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-28}}
+@media (prefers-reduced-motion: reduce){.wire.new{animation:none;stroke-dasharray:none}}
+.box.old,.portlbl.old,.boxname.old,.boxsub.old{opacity:.5}
+.title-svg{font-family:var(--f-head);font-size:12px;fill:var(--muted)}
+.sv-line{stroke:var(--fg);stroke-width:2;fill:none}
+.sv-fill{fill:var(--sunk);stroke:var(--fg);stroke-width:2}
+.sv-acc{fill:var(--accent)} .sv-cop{fill:var(--copper)}
+.sv-txt{font-family:var(--f-body);font-size:12px;fill:var(--fg)}
+.sv-small{font-family:var(--f-body);font-size:11px;fill:var(--muted)}
+@media (max-width: 860px){
+  .wrap{grid-template-columns:minmax(0,1fr)}
+  nav.rail{position:static;flex-direction:row;overflow-x:auto;gap:4px;padding-bottom:4px}
+  nav.rail .phase{display:none}
+  nav.rail button{grid-template-columns:24px;padding:6px}
+  nav.rail button .nm{display:none}
+  .cols{grid-template-columns:minmax(0,1fr)}
+}
+</style>
+
+<div dir="rtl">
+<header class="top">
+  <div>
+    <h1>بناء الخزنة الذكية</h1>
+    <p class="sub">خزنة بشريحة ATmega32A: تفتح بالباسورد أو 3 سقفات، وتقفل بسقفتين. خطوة خطوة.</p>
+  </div>
+  <div class="progress" id="progress"></div>
+</header>
+
+<div class="wrap">
+  <nav class="rail" id="rail" aria-label="الخطوات"></nav>
+  <main id="main"></main>
+</div>
+
+</div>
+<textarea id="hex-blink" hidden>/*
+  ESP32 -&gt; ATmega32A FLASHER : Blink test
+  Everything is inside this one file. Just open it in Arduino IDE and Upload.
+  Board: &quot;ESP32 Dev Module&quot;. Then open Serial Monitor at 115200.
+
+  Wiring (ATmega32 powered from ESP32 3V3 while flashing):
+    ESP32 G23 -&gt; ATmega pin 6  (MOSI)
+    ESP32 G19 -&gt; ATmega pin 7  (MISO)
+    ESP32 G18 -&gt; ATmega pin 8  (SCK)
+    ESP32 G5  -&gt; ATmega pin 9  (RESET, 10k pull-up to + stays)
+    ESP32 G4  -&gt; ATmega pin 13 (XTAL1, clock from the ESP32, helps chips set for a crystal)
+    ESP32 3V3 -&gt; + line,  ESP32 GND -&gt; - line
+  Press the EN (reset) button on the ESP32 to flash again.
+*/
+#include &lt;Arduino.h&gt;
+
+const int P_MOSI = 23, P_MISO = 19, P_SCK = 18, P_RST = 5, P_CLK = 4;
+
+void startClock() {                         // 1 MHz square wave on G4 -&gt; ATmega XTAL1 (pin 13)
+#if defined(ESP_ARDUINO_VERSION_MAJOR) &amp;&amp; ESP_ARDUINO_VERSION_MAJOR &gt;= 3
+  ledcAttach(P_CLK, 1000000, 1);
+  ledcWrite(P_CLK, 1);
+#else
+  ledcSetup(0, 1000000, 1);
+  ledcAttachPin(P_CLK, 0);
+  ledcWrite(0, 1);
+#endif
+}
+const uint16_t PAGE_WORDS = 64;            // ATmega32: 64 words = 128 bytes per page
+
+const uint32_t FW_SIZE = 142;
+const uint8_t FW[] PROGMEM = {
+  0x0C, 0x94, 0x2A, 0x00, 0x0C, 0x94, 0x34, 0x00, 0x0C, 0x94, 0x34, 0x00, 0x0C, 0x94, 0x34, 0x00,
+  0x0C, 0x94, 0x34, 0x00, 0x0C, 0x94, 0x34, 0x00, 0x0C, 0x94, 0x34, 0x00, 0x0C, 0x94, 0x34, 0x00,
+  0x0C, 0x94, 0x34, 0x00, 0x0C, 0x94, 0x34, 0x00, 0x0C, 0x94, 0x34, 0x00, 0x0C, 0x94, 0x34, 0x00,
+  0x0C, 0x94, 0x34, 0x00, 0x0C, 0x94, 0x34, 0x00, 0x0C, 0x94, 0x34, 0x00, 0x0C, 0x94, 0x34, 0x00,
+  0x0C, 0x94, 0x34, 0x00, 0x0C, 0x94, 0x34, 0x00, 0x0C, 0x94, 0x34, 0x00, 0x0C, 0x94, 0x34, 0x00,
+  0x0C, 0x94, 0x34, 0x00, 0x11, 0x24, 0x1F, 0xBE, 0xCF, 0xE5, 0xD8, 0xE0, 0xDE, 0xBF, 0xCD, 0xBF,
+  0x0E, 0x94, 0x36, 0x00, 0x0C, 0x94, 0x45, 0x00, 0x0C, 0x94, 0x00, 0x00, 0xB8, 0x9A, 0x91, 0xE0,
+  0x88, 0xB3, 0x89, 0x27, 0x88, 0xBB, 0x2F, 0xE3, 0x3D, 0xE0, 0x83, 0xE0, 0x21, 0x50, 0x30, 0x40,
+  0x80, 0x40, 0xE1, 0xF7, 0x00, 0xC0, 0x00, 0x00, 0xF3, 0xCF, 0xF8, 0x94, 0xFF, 0xCF,
+};
+
+uint8_t xfer(uint8_t out) {                 // bit-banged SPI, mode 0, ~60 kHz (safe for a 1 MHz chip)
+  uint8_t in = 0;
+  for (int i = 7; i &gt;= 0; i--) {
+    digitalWrite(P_MOSI, (out &gt;&gt; i) &amp; 1);
+    delayMicroseconds(8);
+    digitalWrite(P_SCK, HIGH);
+    delayMicroseconds(8);
+    in = (in &lt;&lt; 1) | digitalRead(P_MISO);
+    digitalWrite(P_SCK, LOW);
+  }
+  return in;
+}
+uint8_t cmd(uint8_t a, uint8_t b, uint8_t c, uint8_t d) { xfer(a); xfer(b); xfer(c); return xfer(d); }
+
+bool enterProgramming() {
+  for (int tries = 0; tries &lt; 5; tries++) {
+    digitalWrite(P_SCK, LOW);
+    digitalWrite(P_RST, HIGH); delay(5);
+    digitalWrite(P_RST, LOW);  delay(30);
+    xfer(0xAC); xfer(0x53); uint8_t echo = xfer(0x00); xfer(0x00);
+    if (echo == 0x53) return true;
+    Serial.printf(&quot;  try %d: no answer (got 0x%02X)\n&quot;, tries + 1, echo);
+  }
+  return false;
+}
+
+void finish(bool ok) {
+  digitalWrite(P_RST, HIGH);
+  pinMode(P_MOSI, INPUT); pinMode(P_SCK, INPUT); pinMode(P_RST, INPUT);   // let the ATmega run
+  Serial.println(ok ? &quot;\n==== DONE: verify 100% OK ====&quot; : &quot;\n==== FAILED ====&quot;);
+  Serial.println(ok ? &quot;Now follow the next step in the guide.&quot; : &quot;Check: 3V3 and GND wires, pins 10/30 to +, 11/31 to -, G23-&gt;6, G19-&gt;7, G18-&gt;8, G5-&gt;9, G4-&gt;13. Then press EN.&quot;);
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(1500);
+  Serial.println(&quot;\nESP32 -&gt; ATmega32A flasher: Blink test&quot;);
+  pinMode(P_MOSI, OUTPUT); pinMode(P_SCK, OUTPUT); pinMode(P_RST, OUTPUT); pinMode(P_MISO, INPUT);
+  startClock();
+  delay(50);
+  Serial.printf(&quot;MISO line idle level: %d\n&quot;, digitalRead(P_MISO));
+
+  if (!enterProgramming()) { Serial.println(&quot;The ATmega32 does not answer.&quot;); finish(false); return; }
+  uint8_t s0 = cmd(0x30, 0, 0, 0), s1 = cmd(0x30, 0, 1, 0), s2 = cmd(0x30, 0, 2, 0);
+  Serial.printf(&quot;Signature: %02X %02X %02X %s\n&quot;, s0, s1, s2, (s0 == 0x1E &amp;&amp; s1 == 0x95 &amp;&amp; s2 == 0x02) ? &quot;(ATmega32 OK)&quot; : &quot;(UNEXPECTED)&quot;);
+  uint8_t lf = cmd(0x50, 0, 0, 0), hf = cmd(0x58, 0x08, 0, 0);
+  Serial.printf(&quot;Fuses: low=%02X high=%02X  (factory = E1 99, internal 1 MHz)\n&quot;, lf, hf);
+  if (s0 != 0x1E || s1 != 0x95) { finish(false); return; }
+
+  Serial.println(&quot;Erasing...&quot;);
+  cmd(0xAC, 0x80, 0, 0); delay(20);
+  enterProgramming();
+
+  uint32_t words = (FW_SIZE + 1) / 2;
+  Serial.printf(&quot;Writing %u bytes...\n&quot;, (unsigned)FW_SIZE);
+  for (uint32_t page = 0; page * PAGE_WORDS &lt; words; page++) {
+    for (uint16_t i = 0; i &lt; PAGE_WORDS; i++) {
+      uint32_t w = page * PAGE_WORDS + i;
+      uint8_t lo = (2 * w &lt; FW_SIZE) ? pgm_read_byte(&amp;FW[2 * w]) : 0xFF;
+      uint8_t hi = (2 * w + 1 &lt; FW_SIZE) ? pgm_read_byte(&amp;FW[2 * w + 1]) : 0xFF;
+      cmd(0x40, 0, i, lo);
+      cmd(0x48, 0, i, hi);
+    }
+    uint16_t a = page * PAGE_WORDS;
+    cmd(0x4C, a &gt;&gt; 8, a &amp; 0xFF, 0);
+    delay(10);
+    Serial.print(&#x27;#&#x27;);
+  }
+  Serial.println(&quot;\nVerifying...&quot;);
+  uint32_t bad = 0;
+  for (uint32_t w = 0; w &lt; words; w++) {
+    uint8_t lo = cmd(0x20, w &gt;&gt; 8, w &amp; 0xFF, 0), hi = cmd(0x28, w &gt;&gt; 8, w &amp; 0xFF, 0);
+    if (lo != pgm_read_byte(&amp;FW[2 * w])) bad++;
+    if (2 * w + 1 &lt; FW_SIZE &amp;&amp; hi != pgm_read_byte(&amp;FW[2 * w + 1])) bad++;
+  }
+  Serial.printf(&quot;Verify: %u bytes wrong\n&quot;, (unsigned)bad);
+  finish(bad == 0);
+}
+
+void loop() {}
+</textarea>
+<textarea id="hex-safe" hidden>/*
+  ESP32 -&gt; ATmega32A FLASHER : Smart Safe
+  Everything is inside this one file. Just open it in Arduino IDE and Upload.
+  Board: &quot;ESP32 Dev Module&quot;. Then open Serial Monitor at 115200.
+
+  Wiring (ATmega32 powered from ESP32 3V3 while flashing):
+    ESP32 G23 -&gt; ATmega pin 6  (MOSI)
+    ESP32 G19 -&gt; ATmega pin 7  (MISO)
+    ESP32 G18 -&gt; ATmega pin 8  (SCK)
+    ESP32 G5  -&gt; ATmega pin 9  (RESET, 10k pull-up to + stays)
+    ESP32 G4  -&gt; ATmega pin 13 (XTAL1, clock from the ESP32, helps chips set for a crystal)
+    ESP32 3V3 -&gt; + line,  ESP32 GND -&gt; - line
+  Press the EN (reset) button on the ESP32 to flash again.
+*/
+#include &lt;Arduino.h&gt;
+
+const int P_MOSI = 23, P_MISO = 19, P_SCK = 18, P_RST = 5, P_CLK = 4;
+
+void startClock() {                         // 1 MHz square wave on G4 -&gt; ATmega XTAL1 (pin 13)
+#if defined(ESP_ARDUINO_VERSION_MAJOR) &amp;&amp; ESP_ARDUINO_VERSION_MAJOR &gt;= 3
+  ledcAttach(P_CLK, 1000000, 1);
+  ledcWrite(P_CLK, 1);
+#else
+  ledcSetup(0, 1000000, 1);
+  ledcAttachPin(P_CLK, 0);
+  ledcWrite(0, 1);
+#endif
+}
+const uint16_t PAGE_WORDS = 64;            // ATmega32: 64 words = 128 bytes per page
+
+const uint32_t FW_SIZE = 2620;
+const uint8_t FW[] PROGMEM = {
+  0x0C, 0x94, 0x2A, 0x00, 0x0C, 0x94, 0x47, 0x00, 0x0C, 0x94, 0x47, 0x00, 0x0C, 0x94, 0x47, 0x00,
+  0x0C, 0x94, 0x47, 0x00, 0x0C, 0x94, 0x47, 0x00, 0x0C, 0x94, 0x47, 0x00, 0x0C, 0x94, 0x47, 0x00,
+  0x0C, 0x94, 0x47, 0x00, 0x0C, 0x94, 0x47, 0x00, 0x0C, 0x94, 0x2C, 0x01, 0x0C, 0x94, 0x47, 0x00,
+  0x0C, 0x94, 0x47, 0x00, 0x0C, 0x94, 0x47, 0x00, 0x0C, 0x94, 0x47, 0x00, 0x0C, 0x94, 0x47, 0x00,
+  0x0C, 0x94, 0x47, 0x00, 0x0C, 0x94, 0x47, 0x00, 0x0C, 0x94, 0x47, 0x00, 0x0C, 0x94, 0x47, 0x00,
+  0x0C, 0x94, 0x47, 0x00, 0x11, 0x24, 0x1F, 0xBE, 0xCF, 0xE5, 0xD8, 0xE0, 0xDE, 0xBF, 0xCD, 0xBF,
+  0x11, 0xE0, 0xA0, 0xE6, 0xB0, 0xE0, 0xE4, 0xEE, 0xF8, 0xE0, 0x02, 0xC0, 0x05, 0x90, 0x0D, 0x92,
+  0xA8, 0x3B, 0xB1, 0x07, 0xD9, 0xF7, 0x21, 0xE0, 0xA8, 0xEB, 0xB1, 0xE0, 0x01, 0xC0, 0x1D, 0x92,
+  0xA8, 0x3D, 0xB2, 0x07, 0xE1, 0xF7, 0x0E, 0x94, 0x51, 0x01, 0x0C, 0x94, 0x70, 0x04, 0x0C, 0x94,
+  0x00, 0x00, 0x83, 0xB9, 0x84, 0xE8, 0x86, 0xBF, 0x06, 0xB6, 0x07, 0xFE, 0xFD, 0xCF, 0x08, 0x95,
+  0xCF, 0x93, 0xC8, 0x2F, 0x84, 0xEA, 0x86, 0xBF, 0x06, 0xB6, 0x07, 0xFE, 0xFD, 0xCF, 0x80, 0x91,
+  0x69, 0x00, 0x88, 0x0F, 0x0E, 0x94, 0x49, 0x00, 0x8C, 0x2F, 0x88, 0x60, 0x0E, 0x94, 0x49, 0x00,
+  0x84, 0xE9, 0x86, 0xBF, 0xCF, 0x91, 0x08, 0x95, 0x2F, 0xB7, 0xF8, 0x94, 0x60, 0x91, 0xD4, 0x01,
+  0x70, 0x91, 0xD5, 0x01, 0x80, 0x91, 0xD6, 0x01, 0x90, 0x91, 0xD7, 0x01, 0x2F, 0xBF, 0x08, 0x95,
+  0xCF, 0x93, 0xC8, 0x2F, 0xC6, 0x2B, 0x8C, 0x2F, 0x84, 0x60, 0x0E, 0x94, 0x50, 0x00, 0x00, 0x00,
+  0x8C, 0x2F, 0x0E, 0x94, 0x50, 0x00, 0x80, 0xE1, 0x8A, 0x95, 0xF1, 0xF7, 0x00, 0xC0, 0xCF, 0x91,
+  0x08, 0x95, 0xCF, 0x93, 0xDF, 0x93, 0xC8, 0x2F, 0xD6, 0x2F, 0x80, 0x7F, 0x0E, 0x94, 0x70, 0x00,
+  0x6D, 0x2F, 0x8C, 0x2F, 0x82, 0x95, 0x80, 0x7F, 0xDF, 0x91, 0xCF, 0x91, 0x0C, 0x94, 0x70, 0x00,
+  0xC2, 0x9A, 0x01, 0x97, 0x10, 0xF4, 0xC2, 0x98, 0x08, 0x95, 0xE9, 0xEF, 0xF0, 0xE0, 0x31, 0x97,
+  0xF1, 0xF7, 0x00, 0xC0, 0x00, 0x00, 0xF5, 0xCF, 0x01, 0x97, 0x08, 0xF4, 0x08, 0x95, 0xE9, 0xEF,
+  0xF0, 0xE0, 0x31, 0x97, 0xF1, 0xF7, 0x00, 0xC0, 0x00, 0x00, 0xF6, 0xCF, 0xEF, 0x92, 0xFF, 0x92,
+  0x0F, 0x93, 0x1F, 0x93, 0xCF, 0x93, 0x7C, 0x01, 0x8B, 0x01, 0x60, 0xE0, 0x80, 0xE8, 0x0E, 0x94,
+  0x81, 0x00, 0xC0, 0xE1, 0xF7, 0x01, 0x80, 0x81, 0x88, 0x23, 0xF1, 0xF0, 0xFF, 0xEF, 0xEF, 0x1A,
+  0xFF, 0x0A, 0x61, 0xE0, 0x0E, 0x94, 0x81, 0x00, 0xC1, 0x50, 0xA1, 0xF7, 0x60, 0xE0, 0x80, 0xEC,
+  0x0E, 0x94, 0x81, 0x00, 0xC0, 0xE1, 0xF8, 0x01, 0x80, 0x81, 0x88, 0x23, 0x79, 0xF0, 0x0F, 0x5F,
+  0x1F, 0x4F, 0x61, 0xE0, 0x0E, 0x94, 0x81, 0x00, 0xC1, 0x50, 0xA9, 0xF7, 0xCF, 0x91, 0x1F, 0x91,
+  0x0F, 0x91, 0xFF, 0x90, 0xEF, 0x90, 0x08, 0x95, 0x80, 0xE2, 0xE3, 0xCF, 0x80, 0xE2, 0xF1, 0xCF,
+  0x80, 0x91, 0xC9, 0x01, 0x88, 0x23, 0x31, 0xF0, 0x6B, 0xE8, 0x70, 0xE0, 0x8C, 0xE9, 0x90, 0xE0,
+  0x0C, 0x94, 0xA6, 0x00, 0x67, 0xEA, 0x70, 0xE0, 0x87, 0xEB, 0x90, 0xE0, 0xF9, 0xCF, 0xCF, 0x93,
+  0xDF, 0x93, 0xEC, 0x01, 0x80, 0xED, 0x97, 0xE0, 0x9B, 0xBD, 0x8A, 0xBD, 0x81, 0xE0, 0x80, 0x93,
+  0xC9, 0x01, 0x10, 0x92, 0xC7, 0x01, 0xC0, 0x9A, 0xC1, 0x98, 0x80, 0xE5, 0x90, 0xE0, 0x0E, 0x94,
+  0x90, 0x00, 0x8C, 0xE3, 0x90, 0xE0, 0x0E, 0x94, 0x9C, 0x00, 0x80, 0xE5, 0x90, 0xE0, 0x0E, 0x94,
+  0x90, 0x00, 0xBE, 0x01, 0x84, 0xEC, 0x90, 0xE0, 0x0E, 0x94, 0xA6, 0x00, 0x80, 0xEB, 0x94, 0xE0,
+  0x0E, 0x94, 0x9C, 0x00, 0xDF, 0x91, 0xCF, 0x91, 0x0C, 0x94, 0xD8, 0x00, 0xCF, 0x93, 0xDF, 0x93,
+  0xEC, 0x01, 0x88, 0xEE, 0x93, 0xE0, 0x9B, 0xBD, 0x8A, 0xBD, 0x10, 0x92, 0xC9, 0x01, 0x10, 0x92,
+  0xC8, 0x01, 0xC0, 0x98, 0xC1, 0x9A, 0x8A, 0xEF, 0x90, 0xE0, 0x0E, 0x94, 0x90, 0x00, 0xBE, 0x01,
+  0x8D, 0xEB, 0x90, 0xE0, 0x0E, 0x94, 0xA6, 0x00, 0x80, 0xEB, 0x94, 0xE0, 0x0E, 0x94, 0x9C, 0x00,
+  0xDF, 0x91, 0xCF, 0x91, 0x0C, 0x94, 0xD8, 0x00, 0x1F, 0x92, 0x0F, 0x92, 0x0F, 0xB6, 0x0F, 0x92,
+  0x11, 0x24, 0x8F, 0x93, 0x9F, 0x93, 0xAF, 0x93, 0xBF, 0x93, 0x80, 0x91, 0xD4, 0x01, 0x90, 0x91,
+  0xD5, 0x01, 0xA0, 0x91, 0xD6, 0x01, 0xB0, 0x91, 0xD7, 0x01, 0x01, 0x96, 0xA1, 0x1D, 0xB1, 0x1D,
+  0x80, 0x93, 0xD4, 0x01, 0x90, 0x93, 0xD5, 0x01, 0xA0, 0x93, 0xD6, 0x01, 0xB0, 0x93, 0xD7, 0x01,
+  0xBF, 0x91, 0xAF, 0x91, 0x9F, 0x91, 0x8F, 0x91, 0x0F, 0x90, 0x0F, 0xBE, 0x0F, 0x90, 0x1F, 0x90,
+  0x18, 0x95, 0xCF, 0x93, 0xDF, 0x93, 0xCD, 0xB7, 0xDE, 0xB7, 0x61, 0x97, 0x0F, 0xB6, 0xF8, 0x94,
+  0xDE, 0xBF, 0x0F, 0xBE, 0xCD, 0xBF, 0x84, 0xB7, 0x80, 0x68, 0x84, 0xBF, 0x84, 0xB7, 0x80, 0x68,
+  0x84, 0xBF, 0x8F, 0xE0, 0x8A, 0xBB, 0x8F, 0xEF, 0x8B, 0xBB, 0x87, 0xB3, 0x87, 0x60, 0x87, 0xBB,
+  0x8A, 0x98, 0x8A, 0xE0, 0x83, 0xBF, 0x8C, 0xE7, 0x8C, 0xBF, 0x89, 0xB7, 0x82, 0x60, 0x89, 0xBF,
+  0x78, 0x94, 0x11, 0xB8, 0x82, 0xE0, 0x80, 0xB9, 0x90, 0xB1, 0x92, 0x30, 0x08, 0xF4, 0x80, 0xB9,
+  0x84, 0xE0, 0x86, 0xBF, 0x83, 0xED, 0x90, 0xE3, 0x01, 0x97, 0xF1, 0xF7, 0x00, 0xC0, 0x00, 0x00,
+  0x10, 0xE2, 0x44, 0xEA, 0xF4, 0x2E, 0x54, 0xE9, 0xE5, 0x2E, 0xF6, 0xBE, 0x06, 0xB6, 0x07, 0xFE,
+  0xFD, 0xCF, 0x81, 0x2F, 0x88, 0x0F, 0x0E, 0x94, 0x49, 0x00, 0x81, 0xB1, 0xE6, 0xBE, 0x91, 0xE2,
+  0x9A, 0x95, 0xF1, 0xF7, 0x00, 0x00, 0x88, 0x7F, 0x00, 0xE0, 0x88, 0x31, 0x19, 0xF4, 0x10, 0x93,
+  0x69, 0x00, 0x01, 0xE0, 0x1F, 0x5F, 0x10, 0x34, 0x19, 0xF0, 0x00, 0x23, 0x09, 0xF4, 0xE8, 0xC0,
+  0x60, 0xE0, 0x80, 0xE3, 0x0E, 0x94, 0x70, 0x00, 0xE1, 0xEE, 0xF4, 0xE0, 0x31, 0x97, 0xF1, 0xF7,
+  0x00, 0xC0, 0x00, 0x00, 0x60, 0xE0, 0x80, 0xE3, 0x0E, 0x94, 0x70, 0x00, 0xF2, 0xE3, 0xFA, 0x95,
+  0xF1, 0xF7, 0x60, 0xE0, 0x80, 0xE3, 0x0E, 0x94, 0x70, 0x00, 0x60, 0xE0, 0x80, 0xE2, 0x0E, 0x94,
+  0x70, 0x00, 0x60, 0xE0, 0x88, 0xE2, 0x0E, 0x94, 0x81, 0x00, 0x60, 0xE0, 0x8C, 0xE0, 0x0E, 0x94,
+  0x81, 0x00, 0x60, 0xE0, 0x86, 0xE0, 0x0E, 0x94, 0x81, 0x00, 0x60, 0xE0, 0x81, 0xE0, 0x0E, 0x94,
+  0x81, 0x00, 0x83, 0xEF, 0x91, 0xE0, 0x01, 0x97, 0xF1, 0xF7, 0x00, 0xC0, 0x00, 0x00, 0x01, 0x11,
+  0xBC, 0xC0, 0x8A, 0xE0, 0xC0, 0x9A, 0xE7, 0xEA, 0xF1, 0xE6, 0x31, 0x97, 0xF1, 0xF7, 0x00, 0xC0,
+  0x00, 0x00, 0xC0, 0x98, 0xE7, 0xEA, 0xF1, 0xE6, 0x31, 0x97, 0xF1, 0xF7, 0x00, 0xC0, 0x00, 0x00,
+  0x81, 0x50, 0x81, 0xF7, 0x8D, 0x9A, 0x82, 0xE8, 0x8F, 0xBD, 0x89, 0xE1, 0x8E, 0xBD, 0x8F, 0xE1,
+  0x9E, 0xE4, 0x97, 0xBD, 0x86, 0xBD, 0x88, 0xEE, 0x93, 0xE0, 0x9B, 0xBD, 0x8A, 0xBD, 0xC1, 0x9A,
+  0x49, 0xE0, 0x50, 0xE0, 0x60, 0xE0, 0x70, 0xE0, 0x80, 0xE6, 0x90, 0xE0, 0x0E, 0x94, 0x3F, 0x04,
+  0x80, 0x91, 0x60, 0x00, 0x80, 0x53, 0x8A, 0x30, 0x30, 0xF0, 0x69, 0xEE, 0x70, 0xE0, 0x80, 0xE6,
+  0x90, 0xE0, 0x0E, 0x94, 0x38, 0x04, 0x10, 0x92, 0x68, 0x00, 0x6E, 0xEE, 0x70, 0xE0, 0x87, 0xEF,
+  0x90, 0xE0, 0x0E, 0x94, 0xA6, 0x00, 0x88, 0xEE, 0x93, 0xE0, 0x0E, 0x94, 0x9C, 0x00, 0x0E, 0x94,
+  0xD8, 0x00, 0xCC, 0x24, 0xC3, 0x94, 0xD1, 0x2C, 0x9E, 0x01, 0x2F, 0x5F, 0x3F, 0x4F, 0x79, 0x01,
+  0x24, 0xE0, 0x32, 0x2E, 0x5E, 0x01, 0x3E, 0xE0, 0xA3, 0x0E, 0xB1, 0x1C, 0x33, 0xE3, 0x93, 0x2E,
+  0x88, 0x24, 0x83, 0x94, 0xF0, 0xE0, 0xE0, 0xE0, 0x4B, 0xB3, 0x96, 0x01, 0x0E, 0x2E, 0x01, 0xC0,
+  0x22, 0x0F, 0x0A, 0x94, 0xEA, 0xF7, 0x20, 0x95, 0x4F, 0x60, 0x24, 0x23, 0x2B, 0xBB, 0x4A, 0xE0,
+  0x4A, 0x95, 0xF1, 0xF7, 0x29, 0xB3, 0x22, 0x95, 0x2F, 0x70, 0x50, 0xE0, 0x40, 0xE0, 0x30, 0xE0,
+  0xB9, 0x01, 0x04, 0x2E, 0x02, 0xC0, 0x75, 0x95, 0x67, 0x95, 0x0A, 0x94, 0xE2, 0xF7, 0x60, 0xFD,
+  0x58, 0xC0, 0xEE, 0x0F, 0xFF, 0x1F, 0xEE, 0x0F, 0xFF, 0x1F, 0xE5, 0x58, 0xFF, 0x4F, 0xE4, 0x0F,
+  0xF5, 0x1F, 0x10, 0x81, 0x80, 0x91, 0xC2, 0x01, 0x81, 0x17, 0x09, 0xF4, 0x7C, 0xC0, 0x0E, 0x94,
+  0x64, 0x00, 0x40, 0x90, 0xBE, 0x01, 0x50, 0x90, 0xBF, 0x01, 0x60, 0x90, 0xC0, 0x01, 0x70, 0x90,
+  0xC1, 0x01, 0x64, 0x19, 0x75, 0x09, 0x86, 0x09, 0x97, 0x09, 0x69, 0x32, 0x71, 0x05, 0x81, 0x05,
+  0x91, 0x05, 0x08, 0xF4, 0x68, 0xC0, 0x0E, 0x94, 0x64, 0x00, 0x60, 0x93, 0xBE, 0x01, 0x70, 0x93,
+  0xBF, 0x01, 0x80, 0x93, 0xC0, 0x01, 0x90, 0x93, 0xC1, 0x01, 0x10, 0x93, 0xC2, 0x01, 0x11, 0x23,
+  0x09, 0xF4, 0x59, 0xC0, 0x0E, 0x94, 0x64, 0x00, 0x40, 0x90, 0xC3, 0x01, 0x50, 0x90, 0xC4, 0x01,
+  0x60, 0x90, 0xC5, 0x01, 0x70, 0x90, 0xC6, 0x01, 0x64, 0x15, 0x75, 0x05, 0x86, 0x05, 0x97, 0x05,
+  0x28, 0xF5, 0x62, 0xE0, 0x71, 0xE0, 0x8E, 0xE0, 0x91, 0xE0, 0x0E, 0x94, 0xA6, 0x00, 0x43, 0xC0,
+  0x18, 0x32, 0x09, 0xF0, 0xFA, 0xCE, 0x18, 0xE3, 0xF8, 0xCE, 0xC0, 0x9A, 0xFF, 0xE3, 0x0D, 0xE0,
+  0x13, 0xE0, 0xF1, 0x50, 0x00, 0x40, 0x10, 0x40, 0xE1, 0xF7, 0x00, 0xC0, 0x00, 0x00, 0xC0, 0x98,
+  0x49, 0xCF, 0x4F, 0x5F, 0x5F, 0x4F, 0x44, 0x30, 0x51, 0x05, 0x09, 0xF0, 0x99, 0xCF, 0x31, 0x96,
+  0xE4, 0x30, 0xF1, 0x05, 0x09, 0xF0, 0x80, 0xCF, 0x10, 0xE0, 0xA4, 0xCF, 0x84, 0xE1, 0x90, 0xE0,
+  0x0E, 0x94, 0x90, 0x00, 0x1A, 0x32, 0x81, 0xF4, 0x10, 0x92, 0xCA, 0x01, 0x10, 0x92, 0xCB, 0x01,
+  0x80, 0x91, 0xC8, 0x01, 0x88, 0x23, 0x29, 0xF0, 0x8B, 0xEC, 0x90, 0xE0, 0x60, 0xEA, 0x71, 0xE0,
+  0xCC, 0xCF, 0x89, 0xED, 0x90, 0xE0, 0xFA, 0xCF, 0x13, 0x34, 0x09, 0xF0, 0x4C, 0xC0, 0x80, 0x91,
+  0xC9, 0x01, 0x88, 0x23, 0x21, 0xF0, 0x89, 0xE1, 0x91, 0xE0, 0x0E, 0x94, 0x0E, 0x01, 0x10, 0x92,
+  0xCA, 0x01, 0x10, 0x92, 0xCB, 0x01, 0x0E, 0x94, 0x64, 0x00, 0x2B, 0x01, 0x3C, 0x01, 0x11, 0xE0,
+  0x82, 0x99, 0x14, 0xC1, 0x10, 0xE0, 0x10, 0x93, 0xBD, 0x01, 0x80, 0x91, 0xB8, 0x01, 0x88, 0x23,
+  0x09, 0xF4, 0x48, 0xCF, 0x40, 0x91, 0xB9, 0x01, 0x50, 0x91, 0xBA, 0x01, 0x60, 0x91, 0xBB, 0x01,
+  0x70, 0x91, 0xBC, 0x01, 0x93, 0x01, 0x82, 0x01, 0x04, 0x1B, 0x15, 0x0B, 0x26, 0x0B, 0x37, 0x0B,
+  0xB9, 0x01, 0xA8, 0x01, 0x41, 0x3B, 0x54, 0x40, 0x61, 0x05, 0x71, 0x05, 0x08, 0xF4, 0x32, 0xCF,
+  0x40, 0x91, 0xC3, 0x01, 0x50, 0x91, 0xC4, 0x01, 0x60, 0x91, 0xC5, 0x01, 0x70, 0x91, 0xC6, 0x01,
+  0x44, 0x16, 0x55, 0x06, 0x66, 0x06, 0x77, 0x06, 0x58, 0xF0, 0x83, 0x30, 0x09, 0xF0, 0x1B, 0xC1,
+  0x80, 0x91, 0xC9, 0x01, 0x81, 0x11, 0x22, 0xC1, 0x81, 0xEA, 0x91, 0xE0, 0x0E, 0x94, 0xE7, 0x00,
+  0x10, 0x92, 0xB8, 0x01, 0x17, 0xCF, 0x11, 0x34, 0xA1, 0xF4, 0x80, 0x91, 0xC9, 0x01, 0x88, 0x23,
+  0x59, 0xF0, 0x80, 0x92, 0xC8, 0x01, 0x10, 0x92, 0xCA, 0x01, 0x10, 0x92, 0xCB, 0x01, 0x62, 0xE2,
+  0x71, 0xE0, 0x8B, 0xEC, 0x90, 0xE0, 0x69, 0xCF, 0x6F, 0xE2, 0x71, 0xE0, 0x8E, 0xE3, 0x91, 0xE0,
+  0x64, 0xCF, 0x13, 0x32, 0x09, 0xF0, 0x90, 0xC0, 0x80, 0x91, 0xC8, 0x01, 0x88, 0x23, 0x91, 0xF1,
+  0x80, 0x91, 0xCA, 0x01, 0x84, 0x30, 0x38, 0xF1, 0x6B, 0xEC, 0x71, 0xE0, 0x80, 0xE6, 0x90, 0xE0,
+  0x0E, 0x94, 0x38, 0x04, 0x49, 0xE0, 0x50, 0xE0, 0x60, 0xE0, 0x70, 0xE0, 0x80, 0xE6, 0x90, 0xE0,
+  0x0E, 0x94, 0x4F, 0x04, 0x10, 0x92, 0xC8, 0x01, 0x60, 0xEA, 0x71, 0xE0, 0x89, 0xE4, 0x91, 0xE0,
+  0x0E, 0x94, 0xA6, 0x00, 0x80, 0xE5, 0x90, 0xE0, 0x0E, 0x94, 0x90, 0x00, 0x8C, 0xE3, 0x90, 0xE0,
+  0x0E, 0x94, 0x9C, 0x00, 0x80, 0xE5, 0x90, 0xE0, 0x0E, 0x94, 0x90, 0x00, 0x80, 0xEB, 0x94, 0xE0,
+  0x0E, 0x94, 0x9C, 0x00, 0x0B, 0xC0, 0x68, 0xE5, 0x71, 0xE0, 0x82, 0xE6, 0x91, 0xE0, 0x0E, 0x94,
+  0xA6, 0x00, 0x6D, 0xCF, 0x80, 0x91, 0xC9, 0x01, 0x88, 0x23, 0x19, 0xF0, 0x0E, 0x94, 0xD8, 0x00,
+  0x66, 0xCF, 0x60, 0xE6, 0x70, 0xE0, 0x8B, 0xEC, 0x91, 0xE0, 0x0E, 0x94, 0x2F, 0x04, 0x89, 0x2B,
+  0x29, 0xF4, 0x8F, 0xE6, 0x91, 0xE0, 0x0E, 0x94, 0xE7, 0x00, 0x59, 0xCF, 0x80, 0x91, 0xC7, 0x01,
+  0x8F, 0x5F, 0x80, 0x93, 0xC7, 0x01, 0x9D, 0xE0, 0xEA, 0xE6, 0xF0, 0xE0, 0xD7, 0x01, 0x01, 0x90,
+  0x0D, 0x92, 0x9A, 0x95, 0xE1, 0xF7, 0xF5, 0x01, 0x03, 0x2D, 0x11, 0x92, 0x0A, 0x95, 0xE9, 0xF7,
+  0x19, 0x2D, 0x18, 0x1B, 0x19, 0x83, 0xB7, 0x01, 0x8B, 0xE7, 0x91, 0xE0, 0x0E, 0x94, 0xA6, 0x00,
+  0x80, 0xE9, 0x91, 0xE0, 0x0E, 0x94, 0x90, 0x00, 0x80, 0x91, 0xC7, 0x01, 0x83, 0x30, 0x08, 0xF1,
+  0x10, 0x92, 0xC7, 0x01, 0x6A, 0xE8, 0x71, 0xE0, 0x86, 0xE9, 0x91, 0xE0, 0x0E, 0x94, 0xA6, 0x00,
+  0x16, 0xE0, 0x86, 0xE9, 0x90, 0xE0, 0x0E, 0x94, 0x90, 0x00, 0x84, 0xE6, 0x90, 0xE0, 0x0E, 0x94,
+  0x9C, 0x00, 0x11, 0x50, 0xB1, 0xF7, 0x0E, 0x94, 0x64, 0x00, 0x60, 0x5D, 0x7A, 0x48, 0x8F, 0x4F,
+  0x9F, 0x4F, 0x60, 0x93, 0xC3, 0x01, 0x70, 0x93, 0xC4, 0x01, 0x80, 0x93, 0xC5, 0x01, 0x90, 0x93,
+  0xC6, 0x01, 0x88, 0xEE, 0x93, 0xE0, 0x9C, 0xCF, 0x80, 0xED, 0x81, 0x0F, 0x8A, 0x30, 0x08, 0xF0,
+  0x12, 0xCF, 0xE0, 0x91, 0xCA, 0x01, 0xE8, 0x30, 0x08, 0xF0, 0x0D, 0xCF, 0x21, 0xE0, 0x2E, 0x0F,
+  0x20, 0x93, 0xCA, 0x01, 0xF0, 0xE0, 0xE5, 0x53, 0xFE, 0x4F, 0x10, 0x83, 0x82, 0x2F, 0x90, 0xE0,
+  0xFC, 0x01, 0xE5, 0x53, 0xFE, 0x4F, 0x10, 0x82, 0x30, 0x91, 0xC8, 0x01, 0xAB, 0xEC, 0xB1, 0xE0,
+  0xF7, 0x01, 0x4A, 0xE2, 0x31, 0x11, 0x4C, 0x91, 0x41, 0x93, 0x11, 0x96, 0x4E, 0x2F, 0x4E, 0x19,
+  0x42, 0x17, 0xB8, 0xF3, 0x8E, 0x0D, 0x9F, 0x1D, 0xFC, 0x01, 0x10, 0x82, 0x8B, 0xEC, 0x90, 0xE0,
+  0x31, 0x11, 0x02, 0xC0, 0x89, 0xED, 0x90, 0xE0, 0xB7, 0x01, 0x9F, 0xCE, 0x80, 0x91, 0xBD, 0x01,
+  0x81, 0x11, 0xE9, 0xCE, 0x80, 0x91, 0xB9, 0x01, 0x90, 0x91, 0xBA, 0x01, 0xA0, 0x91, 0xBB, 0x01,
+  0xB0, 0x91, 0xBC, 0x01, 0xA3, 0x01, 0x92, 0x01, 0x28, 0x1B, 0x39, 0x0B, 0x4A, 0x0B, 0x5B, 0x0B,
+  0xDA, 0x01, 0xC9, 0x01, 0x89, 0x37, 0x91, 0x05, 0xA1, 0x05, 0xB1, 0x05, 0x08, 0xF4, 0xD3, 0xCE,
+  0x80, 0x91, 0xB8, 0x01, 0x8F, 0x5F, 0x80, 0x93, 0xB8, 0x01, 0x40, 0x92, 0xB9, 0x01, 0x50, 0x92,
+  0xBA, 0x01, 0x60, 0x92, 0xBB, 0x01, 0x70, 0x92, 0xBC, 0x01, 0x60, 0xE0, 0x8F, 0xE8, 0x0E, 0x94,
+  0x81, 0x00, 0x80, 0x91, 0xB8, 0x01, 0x8A, 0x30, 0x08, 0xF0, 0x89, 0xE0, 0x61, 0xE0, 0x80, 0x5D,
+  0x0E, 0x94, 0x81, 0x00, 0xB8, 0xCE, 0x82, 0x30, 0x49, 0xF4, 0x80, 0x91, 0xC9, 0x01, 0x88, 0x23,
+  0x29, 0xF0, 0x8C, 0xEA, 0x91, 0xE0, 0x0E, 0x94, 0x0E, 0x01, 0xE2, 0xCE, 0x60, 0xE0, 0x8F, 0xE8,
+  0x0E, 0x94, 0x81, 0x00, 0x61, 0xE0, 0x80, 0xE2, 0x0E, 0x94, 0x81, 0x00, 0xD9, 0xCE, 0xFB, 0x01,
+  0xDC, 0x01, 0x8D, 0x91, 0x01, 0x90, 0x80, 0x19, 0x01, 0x10, 0xD9, 0xF3, 0x99, 0x0B, 0x08, 0x95,
+  0xFB, 0x01, 0xDC, 0x01, 0x01, 0x90, 0x0D, 0x92, 0x00, 0x20, 0xE1, 0xF7, 0x08, 0x95, 0xDC, 0x01,
+  0xCB, 0x01, 0xFC, 0x01, 0xE1, 0x99, 0xFE, 0xCF, 0x06, 0xC0, 0xFF, 0xBB, 0xEE, 0xBB, 0xE0, 0x9A,
+  0x31, 0x96, 0x0D, 0xB2, 0x0D, 0x92, 0x41, 0x50, 0x50, 0x40, 0xB8, 0xF7, 0x08, 0x95, 0xDC, 0x01,
+  0xA4, 0x0F, 0xB5, 0x1F, 0x41, 0x50, 0x50, 0x40, 0x48, 0xF0, 0xCB, 0x01, 0x84, 0x0F, 0x95, 0x1F,
+  0x2E, 0x91, 0x0E, 0x94, 0x60, 0x04, 0x41, 0x50, 0x50, 0x40, 0xD0, 0xF7, 0x08, 0x95, 0x26, 0x2F,
+  0xE1, 0x99, 0xFE, 0xCF, 0x9F, 0xBB, 0x8E, 0xBB, 0xE0, 0x9A, 0x01, 0x97, 0x0D, 0xB2, 0x02, 0x16,
+  0x31, 0xF0, 0x2D, 0xBB, 0x0F, 0xB6, 0xF8, 0x94, 0xE2, 0x9A, 0xE1, 0x9A, 0x0F, 0xBE, 0x08, 0x95,
+  0xF8, 0x94, 0xFF, 0xCF, 0x31, 0x32, 0x33, 0x34, 0x00, 0x00, 0x00, 0x00, 0x00, 0x27, 0x78, 0x20,
+  0x74, 0x72, 0x69, 0x65, 0x73, 0x20, 0x6C, 0x65, 0x66, 0x74, 0x00, 0x00, 0x00, 0x00, 0x00, 0x31,
+  0x32, 0x33, 0x41, 0x34, 0x35, 0x36, 0x42, 0x37, 0x38, 0x39, 0x43, 0x2A, 0x30, 0x23, 0x44, 0x43,
+  0x3D, 0x6C, 0x6F, 0x63, 0x6B, 0x20, 0x41, 0x3D, 0x6E, 0x65, 0x77, 0x70, 0x61, 0x73, 0x73, 0x00,
+  0x53, 0x41, 0x46, 0x45, 0x3A, 0x20, 0x4F, 0x50, 0x45, 0x4E, 0x00, 0x50, 0x61, 0x73, 0x73, 0x20,
+  0x6F, 0x72, 0x20, 0x33, 0x20, 0x63, 0x6C, 0x61, 0x70, 0x73, 0x00, 0x53, 0x41, 0x46, 0x45, 0x3A,
+  0x20, 0x4C, 0x4F, 0x43, 0x4B, 0x45, 0x44, 0x00, 0x4F, 0x50, 0x45, 0x4E, 0x45, 0x44, 0x00, 0x4E,
+  0x65, 0x77, 0x20, 0x70, 0x61, 0x73, 0x73, 0x77, 0x6F, 0x72, 0x64, 0x3A, 0x00, 0x45, 0x6E, 0x74,
+  0x65, 0x72, 0x20, 0x70, 0x61, 0x73, 0x73, 0x77, 0x6F, 0x72, 0x64, 0x3A, 0x00, 0x31, 0x32, 0x33,
+  0x34, 0x00, 0x41, 0x54, 0x6D, 0x65, 0x67, 0x61, 0x33, 0x32, 0x00, 0x53, 0x6D, 0x61, 0x72, 0x74,
+  0x20, 0x53, 0x61, 0x66, 0x65, 0x00, 0x50, 0x6C, 0x65, 0x61, 0x73, 0x65, 0x20, 0x77, 0x61, 0x69,
+  0x74, 0x00, 0x4C, 0x4F, 0x43, 0x4B, 0x45, 0x44, 0x20, 0x4F, 0x55, 0x54, 0x00, 0x62, 0x79, 0x20,
+  0x6B, 0x65, 0x79, 0x20, 0x43, 0x00, 0x74, 0x68, 0x65, 0x6E, 0x20, 0x70, 0x72, 0x65, 0x73, 0x73,
+  0x20, 0x23, 0x00, 0x74, 0x6F, 0x20, 0x63, 0x68, 0x61, 0x6E, 0x67, 0x65, 0x20, 0x70, 0x61, 0x73,
+  0x73, 0x00, 0x4F, 0x70, 0x65, 0x6E, 0x20, 0x66, 0x69, 0x72, 0x73, 0x74, 0x00, 0x50, 0x61, 0x73,
+  0x73, 0x77, 0x6F, 0x72, 0x64, 0x20, 0x73, 0x61, 0x76, 0x65, 0x64, 0x00, 0x54, 0x72, 0x79, 0x20,
+  0x61, 0x67, 0x61, 0x69, 0x6E, 0x00, 0x4D, 0x69, 0x6E, 0x20, 0x34, 0x20, 0x64, 0x69, 0x67, 0x69,
+  0x74, 0x73, 0x00, 0x62, 0x79, 0x20, 0x70, 0x61, 0x73, 0x73, 0x77, 0x6F, 0x72, 0x64, 0x00, 0x57,
+  0x72, 0x6F, 0x6E, 0x67, 0x20, 0x70, 0x61, 0x73, 0x73, 0x77, 0x6F, 0x72, 0x64, 0x00, 0x57, 0x61,
+  0x69, 0x74, 0x20, 0x33, 0x30, 0x20, 0x73, 0x65, 0x63, 0x00, 0x57, 0x52, 0x4F, 0x4E, 0x47, 0x20,
+  0x78, 0x33, 0x20, 0x21, 0x00, 0x62, 0x79, 0x20, 0x33, 0x20, 0x63, 0x6C, 0x61, 0x70, 0x73, 0x00,
+  0x62, 0x79, 0x20, 0x32, 0x20, 0x63, 0x6C, 0x61, 0x70, 0x73, 0x00, 0x00,
+};
+
+uint8_t xfer(uint8_t out) {                 // bit-banged SPI, mode 0, ~60 kHz (safe for a 1 MHz chip)
+  uint8_t in = 0;
+  for (int i = 7; i &gt;= 0; i--) {
+    digitalWrite(P_MOSI, (out &gt;&gt; i) &amp; 1);
+    delayMicroseconds(8);
+    digitalWrite(P_SCK, HIGH);
+    delayMicroseconds(8);
+    in = (in &lt;&lt; 1) | digitalRead(P_MISO);
+    digitalWrite(P_SCK, LOW);
+  }
+  return in;
+}
+uint8_t cmd(uint8_t a, uint8_t b, uint8_t c, uint8_t d) { xfer(a); xfer(b); xfer(c); return xfer(d); }
+
+bool enterProgramming() {
+  for (int tries = 0; tries &lt; 5; tries++) {
+    digitalWrite(P_SCK, LOW);
+    digitalWrite(P_RST, HIGH); delay(5);
+    digitalWrite(P_RST, LOW);  delay(30);
+    xfer(0xAC); xfer(0x53); uint8_t echo = xfer(0x00); xfer(0x00);
+    if (echo == 0x53) return true;
+    Serial.printf(&quot;  try %d: no answer (got 0x%02X)\n&quot;, tries + 1, echo);
+  }
+  return false;
+}
+
+void finish(bool ok) {
+  digitalWrite(P_RST, HIGH);
+  pinMode(P_MOSI, INPUT); pinMode(P_SCK, INPUT); pinMode(P_RST, INPUT);   // let the ATmega run
+  Serial.println(ok ? &quot;\n==== DONE: verify 100% OK ====&quot; : &quot;\n==== FAILED ====&quot;);
+  Serial.println(ok ? &quot;Now follow the next step in the guide.&quot; : &quot;Check: 3V3 and GND wires, pins 10/30 to +, 11/31 to -, G23-&gt;6, G19-&gt;7, G18-&gt;8, G5-&gt;9, G4-&gt;13. Then press EN.&quot;);
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(1500);
+  Serial.println(&quot;\nESP32 -&gt; ATmega32A flasher: Smart Safe&quot;);
+  pinMode(P_MOSI, OUTPUT); pinMode(P_SCK, OUTPUT); pinMode(P_RST, OUTPUT); pinMode(P_MISO, INPUT);
+  startClock();
+  delay(50);
+  Serial.printf(&quot;MISO line idle level: %d\n&quot;, digitalRead(P_MISO));
+
+  if (!enterProgramming()) { Serial.println(&quot;The ATmega32 does not answer.&quot;); finish(false); return; }
+  uint8_t s0 = cmd(0x30, 0, 0, 0), s1 = cmd(0x30, 0, 1, 0), s2 = cmd(0x30, 0, 2, 0);
+  Serial.printf(&quot;Signature: %02X %02X %02X %s\n&quot;, s0, s1, s2, (s0 == 0x1E &amp;&amp; s1 == 0x95 &amp;&amp; s2 == 0x02) ? &quot;(ATmega32 OK)&quot; : &quot;(UNEXPECTED)&quot;);
+  uint8_t lf = cmd(0x50, 0, 0, 0), hf = cmd(0x58, 0x08, 0, 0);
+  Serial.printf(&quot;Fuses: low=%02X high=%02X  (factory = E1 99, internal 1 MHz)\n&quot;, lf, hf);
+  if (s0 != 0x1E || s1 != 0x95) { finish(false); return; }
+
+  Serial.println(&quot;Erasing...&quot;);
+  cmd(0xAC, 0x80, 0, 0); delay(20);
+  enterProgramming();
+
+  uint32_t words = (FW_SIZE + 1) / 2;
+  Serial.printf(&quot;Writing %u bytes...\n&quot;, (unsigned)FW_SIZE);
+  for (uint32_t page = 0; page * PAGE_WORDS &lt; words; page++) {
+    for (uint16_t i = 0; i &lt; PAGE_WORDS; i++) {
+      uint32_t w = page * PAGE_WORDS + i;
+      uint8_t lo = (2 * w &lt; FW_SIZE) ? pgm_read_byte(&amp;FW[2 * w]) : 0xFF;
+      uint8_t hi = (2 * w + 1 &lt; FW_SIZE) ? pgm_read_byte(&amp;FW[2 * w + 1]) : 0xFF;
+      cmd(0x40, 0, i, lo);
+      cmd(0x48, 0, i, hi);
+    }
+    uint16_t a = page * PAGE_WORDS;
+    cmd(0x4C, a &gt;&gt; 8, a &amp; 0xFF, 0);
+    delay(10);
+    Serial.print(&#x27;#&#x27;);
+  }
+  Serial.println(&quot;\nVerifying...&quot;);
+  uint32_t bad = 0;
+  for (uint32_t w = 0; w &lt; words; w++) {
+    uint8_t lo = cmd(0x20, w &gt;&gt; 8, w &amp; 0xFF, 0), hi = cmd(0x28, w &gt;&gt; 8, w &amp; 0xFF, 0);
+    if (lo != pgm_read_byte(&amp;FW[2 * w])) bad++;
+    if (2 * w + 1 &lt; FW_SIZE &amp;&amp; hi != pgm_read_byte(&amp;FW[2 * w + 1])) bad++;
+  }
+  Serial.printf(&quot;Verify: %u bytes wrong\n&quot;, (unsigned)bad);
+  finish(bad == 0);
+}
+
+void loop() {}
+</textarea>
+
+<script>
+const PIN = {1:'PB0',2:'PB1',3:'PB2',4:'PB3',5:'PB4',6:'PB5',7:'PB6',8:'PB7',9:'RESET',10:'VCC',11:'GND',12:'XTAL2',13:'XTAL1',14:'PD0',15:'PD1',16:'PD2',17:'PD3',18:'PD4',19:'PD5',20:'PD6',21:'PD7',22:'PC0',23:'PC1',24:'PC2',25:'PC3',26:'PC4',27:'PC5',28:'PC6',29:'PC7',30:'AVCC',31:'GND',32:'AREF',33:'PA7',34:'PA6',35:'PA5',36:'PA4',37:'PA3',38:'PA2',39:'PA1',40:'PA0'};
+
+/* parts: from = first step shown, to = last step shown */
+const PARTS = [
+  {id:'esp', name:'ESP32 (الحارق)', sub:'VIN ← أحمر   GND ← أزرق', from:4, to:6, side:'L',
+    ports:[{pin:6,l:'G23',c:'blue'},{pin:7,l:'G19',c:'yellow'},{pin:8,l:'G18',c:'orange'},{pin:9,l:'G5',c:'purple'},{pin:13,l:'G4',c:'cyan'}]},
+  {id:'gled', name:'لمبة خضرا', sub:'+ مقاومة 220، القصيرة ← أزرق', from:5, side:'L', ports:[{pin:1,l:'الرجل الطويلة',c:'green'}]},
+  {id:'rled', name:'لمبة حمرا', sub:'+ مقاومة 220، القصيرة ← أزرق', from:8, side:'L', ports:[{pin:2,l:'الرجل الطويلة',c:'pink'}]},
+  {id:'buz', name:'بازر', sub:'الرجل التانية ← أزرق', from:8, side:'L', ports:[{pin:3,l:'رجل +',c:'brown'}]},
+  {id:'snd', name:'حساس الصوت', sub:'+ ← أحمر   G ← أزرق', from:11, side:'L', ports:[{pin:16,l:'DO',c:'cyan'}]},
+  {id:'srv', name:'سيرفو (القفل)', sub:'أحمر ← أحمر  بني ← أزرق', from:10, side:'L', ports:[{pin:19,l:'السلك الأصفر',c:'orange'}]},
+  {id:'lcd', name:'الشاشة LCD', sub:'VCC ← أحمر   GND ← أزرق', from:7, side:'R', ports:[{pin:22,l:'SCL',c:'yellow'},{pin:23,l:'SDA',c:'blue'}]},
+  {id:'kp', name:'الكيباد', sub:'سلك 1 ← 8 من الشمال لليمين', from:9, side:'R',
+    ports:[{pin:33,l:'سلك 8',c:'purple'},{pin:34,l:'سلك 7',c:'blue'},{pin:35,l:'سلك 6',c:'green'},{pin:36,l:'سلك 5',c:'yellow'},
+           {pin:37,l:'سلك 4',c:'orange'},{pin:38,l:'سلك 3',c:'pink'},{pin:39,l:'سلك 2',c:'cyan'},{pin:40,l:'سلك 1',c:'brown'}]},
+];
+const TAGS = [
+  {pin:10,t:'+',k:'pos',from:3},{pin:11,t:'−',k:'neg',from:3},{pin:30,t:'+',k:'pos',from:3},{pin:31,t:'−',k:'neg',from:3},
+  {pin:9,t:'10k→+',k:'pos',from:3},
+];
+
+const STEPS = [
+ {phase:'تجهيز', name:'جهّز الحاجات', eyebrow:'خطوة 1 · 10 دقايق',
+  lead:'هات حاجات الخزنة واعرف ترقيم رجول الشريحة. رجل رقم 1 جنب نص الدايرة اللي فوق. الرجول بتتعد لتحت على الشمال (1 لـ 20)، وبعدين لفوق على اليمين (21 لـ 40).',
+  parts:[['ATmega32A','الشريحة أم 40 رجل'],['ESP32','الحارق ومصدر الكهربا'],['بريد بورد','الكبيرة'],['شاشة LCD','اللي وراها بوردة I2C'],['كيباد 4×4','فيه 8 سلوك'],['سيرفو SG90','ده القفل'],['حساس صوت','البوردة الحمرا أم مايك'],['2 لمبة LED','خضرا وحمرا'],['بازر','الأسود الصغير'],['مقاومات','2 × 220 و 1 × 10k'],['مكثفات','صغير 104 + كبير 470µF'],['سلوك','كتير']],
+  do:['حط كل حاجات الخزنة قدامك.','امسك الشريحة: نص الدايرة يكون لفوق.','الرجل اللي على الشمال فوق خالص = رجل رقم 1.'],
+  check:'تعرف تشاور على رجل 1 ورجل 20 ورجل 21 ورجل 40.',
+  fix:['مش لاقي نص الدايرة؟ دوّر على نقطة صغيرة مدورة، الركن ده هو رجل 1.']},
+ {phase:'تجهيز', name:'يعني إيه بريد بورد؟', eyebrow:'خطوة 2 · 5 دقايق', bb:true,
+  lead:'البريد بورد لوحة فيها خرمات، بتحط فيها الرجول والسلوك من غير لحام. فيها حاجتين بس لازم تفهمهم:',
+  do:['<b>الخطين اللي على الجنب</b> (خط أحمر + وخط أزرق −) اسمهم "خطوط الكهربا". كل الخرمات اللي على نفس الخط متوصلة ببعض للآخر.','الخط <b>الأحمر = الموجب (+)</b>، والخط <b>الأزرق = السالب (−)</b> ويتسمى برضه GND.','<b>في النص:</b> كل عمود صغير فيه 5 خرمات متوصلين ببعض. العمود اللي جنبه منفصل عنه.','<b>الفاصل اللي في النص</b> بيقسم البورد نصين. الشريحة بتتحط فوقه، عشان كل رجل ياخد عمود لوحده.','<b>عشان توصّل رجل بحاجة:</b> حط طرف السلك في أي خرم في نفس عمود الرجل، والطرف التاني في المكان اللي عايزه.'],
+  check:'فهمت إن الأحمر = + والأزرق = −، وإن الخرمات الـ5 اللي في نفس العمود متوصلين ببعض.',
+  fix:['مش متأكد؟ ابعتلي صورة البريد بورد بتاعتك وأنا أعلّملك عليها.']},
+ {phase:'تجهيز', name:'كهربا الشريحة', eyebrow:'خطوة 3 · 15 دقيقة',
+  lead:'هنوصّل رجول الكهربا بتاعة الشريحة. لسه من غير كهربا خالص.',
+  do:['حط الشريحة فوق الفاصل اللي في نص البريد بورد، ونص الدايرة لفوق.','سلك من رجل 10 ← الخط الأحمر. وسلك من رجل 30 ← الخط الأحمر.','سلك من رجل 11 ← الخط الأزرق. وسلك من رجل 31 ← الخط الأزرق.','<span class="warn">خلي بالك: على اليمين العد بيبدأ من تحت. قصاد رجل 10 = رجل 31 (أزرق)، وقصاد رجل 11 = رجل 30 (أحمر). عدّ الرجول مرتين: لو السلك اترحّل رجل واحدة (29 بدل 30) الشريحة هتسخن جامد.</span>','مقاومة 10k (ألوانها بني، أسود، برتقاني): رجل في عمود رجل 9، والرجل التانية في الخط الأحمر.','المكثف الصغير (مكتوب عليه 104): رجل في عمود رجل 10، والتانية في الخط الأزرق.','لو البريد بورد فيها خطوط فوق وتحت: سلك من أحمر لأحمر، وسلك من أزرق لأزرق.'],
+  check:'رجل 10 و30 واصلين بالأحمر. رجل 11 و31 واصلين بالأزرق. والمقاومة من رجل 9 للأحمر.',
+  fix:['<b>الشريحة سخنت جامد؟</b> افصل الكابل فورًا. غالبًا سلوك 30/31 مترحّلة رجل، أو الشريحة مقلوبة، أو في سلك واصل الأحمر بالأزرق.','رجول الشريحة واسعة ومش داخلة؟ اضغط كل جنب بالراحة على الترابيزة عشان تقرّب شوية.']},
+ {phase:'الحرق', name:'وصّل الـ ESP32', eyebrow:'خطوة 4 · 10 دقايق',
+  lead:'الـ ESP32 هو اللي هيحط البرنامج جوه الشريحة (الحرق)، وهيديها كهربا 3.3 فولت.',
+  do:['G23 في الـ ESP32 ← رجل 6.','G19 ← رجل 7 <b>عن طريق مقاومة 1k</b>: المقاومة من رجل 7 لصف فاضي، وسلك G19 في نفس الصف ده. ده بيحمي الـ ESP32.','G18 ← رجل 8.','G5 ← رجل 9 (المقاومة 10k تفضل مكانها).','G4 ← رجل 13 (ده بيدي الشريحة نبض ساعة وقت الحرق).','<b>VIN</b> (5 فولت) ← الخط الأحمر. GND ← الخط الأزرق.','<span class="warn">شريحتكم محتاجة 5 فولت، على 3.3 مش بترد.</span>'],
+  check:'7 سلوك طالعين من الـ ESP32: 5 للرجول 6 و7 و8 و9 و13، وواحد للأحمر، وواحد للأزرق.',
+  fix:['مش عارف مين G23؟ الأسامي مكتوبة على بوردة الـ ESP32 جنب كل رجل.']},
+ {phase:'الحرق', name:'جرّب بلمبة', eyebrow:'خطوة 5 · 15 دقيقة',
+  lead:'هنحرق برنامج صغير بيخلي لمبة تنور وتطفي. لو اشتغل، يبقى الحارق والشريحة تمام.',
+  do:['اللمبة الخضرا: رجل 1 ← مقاومة 220 (أحمر، أحمر، بني) ← الرجل الطويلة للمبة. الرجل القصيرة ← الخط الأزرق.','<span class="warn">من غير مقاومة اللمبة هتتحرق. ورجلين المقاومة لازم يبقوا في صفين مختلفين، لو في نفس الصف المقاومة كأنها مش موجودة.</span>','وصّل الـ ESP32 باللابتوب بالكابل.','دوس "انسخ الكود" تحت.','افتح Arduino IDE ← File ← New Sketch. امسح كل اللي فيه، والصق الكود.','من Tools ← Board اختار <b>ESP32 Dev Module</b>، ومن Tools ← Port اختار البورت بتاع الـ ESP32.','دوس Upload (السهم ←). لو وقف عند Connecting… دوس زرار BOOT اللي على الـ ESP32 لحد ما يبدأ.','افتح Tools ← Serial Monitor، واختار 115200 تحت، ودوس زرار EN على الـ ESP32.','استنى لحد ما يكتب <b>DONE: verify 100% OK</b>.'],
+  hex:'blink',
+  check:'اللمبة الخضرا تنور ثانية وتطفي ثانية، وتفضل كده.',
+  fix:['<b>اللمبة اتحرقت؟</b> المقاومة مش في الطريق. حط لمبة جديدة ومقاومة 220 أو 1k زي الخطوة فوق.','مكتوب The ATmega32 does not answer: اتأكد إن الكهربا من VIN (مش 3V3)، وراجع الـ5 سلوك، واتأكد إن رجل 10 و30 واصلين بالأحمر و11 و31 بالأزرق.','ابعتلي سكرين شوت من الـ Serial Monitor وأنا أقولك المشكلة فين.','اللمبة بتنور أسرع أو أبطأ بكتير: ابعتلي وأنا أظبط الكود.','بتشتغل بس لما سلك G4 متوصل برجل 13: قولّي.']},
+ {phase:'الحرق', name:'احرق برنامج الخزنة', eyebrow:'خطوة 6 · 10 دقايق',
+  lead:'نحرق البرنامج الحقيقي، وبعدين نغيّر الكهربا لـ 5 فولت لباقي الشغل.',
+  do:['انسخ كود الخزنة تحت، والصقه في Sketch جديد، وارفعه بالظبط زي خطوة 5.','افتح Serial Monitor ودوس EN، واستنى <b>DONE: verify 100% OK</b>.','افصل كابل الـ USB.','شيل الـ5 سلوك (G23 و G19 و G18 و G5 و G4).','الكهربا تفضل على VIN زي ما هي، والـ GND زي ما هو.','رجّع الكابل. كده الـ ESP32 بقى مصدر كهربا بس.'],
+  hex:'safe',
+  check:'اللمبة الخضرا مطفية. يعني الخزنة بدأت وهي مقفولة.',
+  fix:['اللمبة لسه بتنور وتطفي: برنامج التجربة لسه موجود. احرق كود الخزنة تاني.','عايز تغير الكود بعدين؟ رجّع الـ5 سلوك (G19 بالمقاومة 1k). الكهربا تفضل على VIN.']},
+ {phase:'التركيب', name:'الشاشة', eyebrow:'خطوة 7 · 10 دقايق',
+  lead:'الشاشة بتقولك الخزنة بتعمل إيه.',
+  do:['GND في الشاشة ← الأزرق. VCC ← الأحمر.','SDA ← رجل 23.','SCL ← رجل 22.','افصل الكابل ورجّعه عشان الشريحة تبدأ من الأول.'],
+  check:'الشاشة تكتب "Smart Safe" وبعدها "SAFE: LOCKED".',
+  fix:['الشاشة منورة ومفيش كلام: لف المسمار الأزرق الصغير اللي ورا الشاشة بالراحة.','لسه مفيش: بص على اللمبة الخضرا أول ما تشغّل. ومضة طويلة = الشريحة شايفة الشاشة. 10 ومضات سريعة = مش شايفاها، فراجع SDA على رجل 23 وSCL على رجل 22 (على اليمين، العد من تحت: 21 ثم 22 ثم 23).']},
+ {phase:'التركيب', name:'لمبة حمرا وبازر', eyebrow:'خطوة 8 · 10 دقايق',
+  lead:'الأحمر = مقفولة، الأخضر = مفتوحة، والبازر بيصفّر مع كل زرار.',
+  do:['اللمبة الحمرا: رجل 2 ← مقاومة 220 ← الطويلة. القصيرة ← الأزرق. (لازم المقاومة، زي الخضرا.)','البازر: الرجل الطويلة (+) ← رجل 3. التانية ← الأزرق.','افصل الكابل ورجّعه.'],
+  check:'اللمبة الحمرا منورة.',
+  fix:['اللمبة مش بتنور: اقلبها. الرجل الطويلة ناحية الشريحة.']},
+ {phase:'التركيب', name:'الكيباد', eyebrow:'خطوة 9 · 15 دقيقة',
+  lead:'امسك الكيباد ووشه ليك والسلوك تحت. الـ8 سلوك بيروحوا لرجول 40 لحد 33 بالترتيب.',
+  do:['سلك 1 (الشمال) ← رجل 40. سلك 2 ← 39. سلك 3 ← 38. سلك 4 ← 37.','سلك 5 ← 36. سلك 6 ← 35. سلك 7 ← 34. سلك 8 (اليمين) ← 33.','افصل الكابل ورجّعه.','اكتب 1 2 3 4 وبعدين #.'],
+  check:'صفارة مع كل زرار. بعد 1234# الشاشة تكتب OPENED، والأخضر ينور، والبازر يصفّر مرتين.',
+  fix:['الأرقام بتطلع غلط: اعكس الـ8 سلوك (سلك 1 ← 33 … سلك 8 ← 40).','زراير مش بتشتغل: في سلك مش داخل كويس، دخّله تاني.']},
+ {phase:'التركيب', name:'السيرفو (القفل)', eyebrow:'خطوة 10 · 15 دقيقة',
+  lead:'دراع السيرفو هو الترباس. بيلف لما الخزنة تفتح أو تقفل.',
+  do:['السلك البني ← الأزرق (−). السلك الأحمر ← الأحمر (+).','السلك الأصفر (أو البرتقاني) ← رجل 19.','المكثف الكبير 470µF: الرجل الطويلة ← الخط الأحمر (+). الرجل القصيرة ← الخط الأزرق (−). (على جسم المكثف شريط فاتح عليه علامات −، الرجل اللي تحته هي القصيرة. متقلبوش.)','ركّب دراع بلاستيك على السيرفو.','اكتب 1234# يفتح، ودوس C يقفل.'],
+  check:'الدراع يلف حوالي 90 درجة لما يفتح، ويرجع لما تدوس C.',
+  fix:['الشريحة بتعيد تشغيل لما السيرفو يتحرك: المكثف الكبير ناقص أو مقلوب.','الدراع بيلف غلط: قولّي الزاوية اللي عايزها وأظبطها.']},
+ {phase:'التركيب', name:'حساس الصوت', eyebrow:'خطوة 11 · 15 دقيقة',
+  lead:'الحساس بيدي إشارة مع كل صوت عالي، والشريحة بتعد السقفات.',
+  do:['+ في الحساس ← الأحمر. G ← الأزرق.','DO ← رجل 16. رجل AO تفضل فاضية.','في مكان هادي، لف المسمار الأزرق اللي على الحساس بالراحة لحد ما اللمبة الصغيرة اللي عليه تطفي بالعافية.','اسقف مرة: اللمبة اللي على الحساس لازم تنور لحظة.','اقفل الخزنة (C)، واسقف 3 مرات، بين كل سقفة ونص ثانية.'],
+  check:'عدد السقفات يظهر فوق على يمين الشاشة. 3 سقفات تفتح، 2 تقفل.',
+  fix:['السقفات مش بتتعد: لف المسمار شوية عشان يبقى أحسس.','بتفتح لوحدها مع الكلام: لف المسمار الناحية التانية.']},
+ {phase:'النهاية', name:'اعمل الصندوق', eyebrow:'خطوة 12 · 45 دقيقة',
+  lead:'أي كرتونة صغيرة فيها باب تنفع. دراع السيرفو بيقفل الباب من جوه.',
+  do:['اقطع باب في وش الكرتونة، ولزّق جنب واحد بالسلوتيب كمفصلة.','اعمل خرم للكيباد وللشاشة وللمبتين.','لزّق السيرفو من جوه جنب حرف الباب، عشان الدراع يقف قدام الباب وهو مقفول.','لزّق حتة كرتون صغيرة على الباب عشان الدراع يمسكها.','حط البريد بورد جوه أو ورا الكرتونة، والمايك بتاع الحساس باصص لبره.'],
+  check:'وهي مقفولة الباب مش بيتفتح. وهي مفتوحة الباب بيتفتح عادي.',
+  fix:['الدراع مش واصل للباب: قرّب السيرفو، أو استخدم الدراع الأطول.'],
+  box:true},
+ {phase:'النهاية', name:'الاختبار الأخير', eyebrow:'خطوة 13 · 10 دقايق',
+  lead:'جرّب كل حاجة مرة، وبعدين صوّر فيديو قصير احتياطي للمناقشة.',
+  do:['الباسورد 1234# بيفتح.','باسورد غلط 3 مرات: إنذار والكيباد يقفل 30 ثانية.','3 سقفات تفتح، و2 تقفل.','الكلام جنبها مش بيفتحها.','وهي مفتوحة: دوس A، اكتب باسورد جديد (4 لـ 8 أرقام)، ودوس #. افصل ورجّع الكابل واتأكد إن الجديد شغال.'],
+  check:'الـ5 اختبارات نجحوا. الخزنة خلصت! اللي بعدها: مشروع الري.',
+  fix:['في حاجة مش شغالة؟ ابعتلي صورة للبورد واللي مكتوب على الشاشة.']},
+];
+
+const COLORS = {blue:'--w-blue',yellow:'--w-yellow',orange:'--w-orange',purple:'--w-purple',green:'--w-green',cyan:'--w-cyan',pink:'--w-pink',brown:'--w-brown'};
+let done = {};
+try { done = JSON.parse(localStorage.getItem('safe-ar-done') || '{}'); } catch (e) { done = {}; }
+let cur = 0;
+try { const s = parseInt(localStorage.getItem('safe-ar-step'), 10); if (s >= 0 && s < STEPS.length) cur = s; } catch (e) {}
+
+const NS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs, parent, text) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (text != null) {
+    e.textContent = text;
+    if (tag === 'text' && /[\u0600-\u06FF]/.test(String(text))) {   // Arabic: right-to-left, keep the same visual anchor
+      const a = attrs['text-anchor'] || 'start';
+      e.setAttribute('direction', 'rtl');
+      e.setAttribute('text-anchor', a === 'start' ? 'end' : a === 'end' ? 'start' : 'middle');
+    }
+  }
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+function drawCircuit(stepNo) {
+  const W = 780, PITCH = 24, TOP = 40;
+  const CX1 = 290, CX2 = 490;
+  const H = TOP + 20 * PITCH + 40;
+  const svg = el('svg', {viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'رسمة التوصيل للخطوة دي'});
+  const py = i => i <= 20 ? TOP + 14 + (i - 1) * PITCH : TOP + 14 + (40 - i) * PITCH;
+
+  const visible = PARTS.filter(p => stepNo >= p.from && (p.to == null || stepNo <= p.to));
+  const used = new Set();
+  visible.forEach(p => p.ports.forEach(q => used.add(q.pin)));
+  const tags = TAGS.filter(t => stepNo >= t.from);
+  tags.forEach(t => used.add(t.pin));
+
+  // chip
+  el('rect', {x: CX1, y: TOP, width: CX2 - CX1, height: 20 * PITCH + 4, rx: 6, class: 'chip'}, svg);
+  el('path', {d: `M${(CX1+CX2)/2-14} ${TOP} a14 14 0 0 0 28 0 z`, class: 'chip-notch'}, svg);
+  el('text', {x: (CX1+CX2)/2, y: TOP + 20 * PITCH - 30, 'text-anchor': 'middle', class: 'pinlbl', 'font-size': 13}, svg, 'ATmega32A');
+  el('circle', {cx: CX1 + 12, cy: TOP + 12, r: 3.5, class: 'chip-notch'}, svg);
+  for (let i = 1; i <= 40; i++) {
+    const left = i <= 20, y = py(i), u = used.has(i);
+    el('line', {x1: left ? CX1 - 14 : CX2, x2: left ? CX1 : CX2 + 14, y1: y, y2: y, class: 'stub' + (u ? ' used' : '')}, svg);
+    el('text', {x: left ? CX1 - 18 : CX2 + 18, y: y - 6, 'text-anchor': left ? 'end' : 'start', class: 'pinnum'}, svg, i);
+    el('text', {x: left ? CX1 + 22 : CX2 - 22, y: y + 4, 'text-anchor': left ? 'start' : 'end', class: 'pinlbl' + (u ? ' used' : '')}, svg, PIN[i]);
+  }
+  // power tags inside the chip
+  tags.forEach(t => {
+    const left = t.pin <= 20, y = py(t.pin);
+    const w = t.t.length * 7 + 10;
+    const x = left ? CX1 + 64 : CX2 - 64 - w;
+    el('rect', {x, y: y - 9, width: w, height: 16, rx: 8, class: 'tagbg-' + t.k}, svg);
+    el('text', {x: x + w / 2, y: y + 3, 'text-anchor': 'middle', class: 'tag tag-' + t.k}, svg, t.t);
+  });
+
+  // part boxes, stacked so they never overlap
+  ['L', 'R'].forEach(side => {
+    const list = visible.filter(p => p.side === side).map(p => {
+      const ports = p.ports.slice().sort((a, b) => py(a.pin) - py(b.pin));
+      const h = 38 + ports.length * 20;
+      const centre = ports.reduce((s, q) => s + py(q.pin), 0) / ports.length;
+      return {p, ports, h, top: centre - h / 2};
+    }).sort((a, b) => a.top - b.top);
+    let bottom = 0;
+    list.forEach(b => { if (b.top < bottom + 8) b.top = bottom + 8; if (b.top < 4) b.top = 4; bottom = b.top + b.h; });
+    const BX = side === 'L' ? 14 : W - 14 - 170, BW = 170;
+    let lane = 0;
+    list.forEach(b => {
+      const isNew = b.p.from === stepNo;
+      const st = isNew ? 'new' : 'old';
+      el('rect', {x: BX, y: b.top, width: BW, height: b.h, rx: 9, class: 'box ' + st}, svg);
+      el('text', {x: BX + 10, y: b.top + 17, class: 'boxname ' + st}, svg, b.p.name);
+      el('text', {x: BX + 10, y: b.top + 31, class: 'boxsub ' + st}, svg, b.p.sub);
+      b.ports.forEach((q, i) => {
+        const yy = b.top + 38 + i * 20 + 8;
+        const edge = side === 'L' ? BX + BW : BX;
+        el('text', {x: side === 'L' ? edge - 10 : edge + 10, y: yy + 4, 'text-anchor': side === 'L' ? 'end' : 'start', class: 'portlbl ' + st}, svg, q.l);
+        const pinX = side === 'L' ? CX1 - 14 : CX2 + 14, y2 = py(q.pin);
+        let d;
+        if (Math.abs(yy - y2) < 1) d = `M${edge} ${yy} H${pinX}`;
+        else {
+          const lx = side === 'L' ? edge + 18 + (lane % 6) * 9 : edge - 18 - (lane % 6) * 9;
+          lane++;
+          d = `M${edge} ${yy} H${lx} V${y2} H${pinX}`;
+        }
+        el('path', {d, class: 'wire ' + st, style: `stroke:var(${COLORS[q.c]})`}, svg);
+        el('circle', {cx: edge, cy: yy, r: 3.5, style: `fill:var(${COLORS[q.c]})`, class: st === 'old' ? 'wire old' : ''}, svg);
+      });
+    });
+  });
+  return svg;
+}
+
+function drawBox() {
+  const svg = el('svg', {viewBox: '0 0 780 300', role: 'img', 'aria-label': 'شكل الصندوق من قدام ومن جوه'});
+  // front view
+  el('text', {x: 40, y: 24, class: 'title-svg'}, svg, 'من قدام');
+  el('rect', {x: 40, y: 36, width: 300, height: 240, rx: 6, class: 'sv-fill'}, svg);
+  el('rect', {x: 60, y: 56, width: 170, height: 200, rx: 4, class: 'sv-line'}, svg);
+  el('text', {x: 145, y: 160, 'text-anchor': 'middle', class: 'sv-small'}, svg, 'الباب');
+  el('line', {x1: 60, y1: 56, x2: 60, y2: 256, class: 'sv-line', 'stroke-width': 5}, svg);
+  el('text', {x: 66, y: 270, class: 'sv-small'}, svg, 'مفصلة سلوتيب');
+  el('rect', {x: 245, y: 60, width: 80, height: 30, rx: 3, class: 'sv-acc'}, svg);
+  el('text', {x: 285, y: 80, 'text-anchor': 'middle', class: 'sv-small', style: 'fill:var(--surface)'}, svg, 'LCD');
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++)
+    el('rect', {x: 251 + c * 18, y: 110 + r * 18, width: 14, height: 14, rx: 3, class: 'sv-cop'}, svg);
+  el('text', {x: 285, y: 196, 'text-anchor': 'middle', class: 'sv-small'}, svg, 'الكيباد');
+  el('circle', {cx: 265, cy: 220, r: 7, style: 'fill:var(--w-green)'}, svg);
+  el('circle', {cx: 305, cy: 220, r: 7, style: 'fill:var(--w-pos)'}, svg);
+  el('circle', {cx: 285, cy: 250, r: 9, class: 'sv-line'}, svg);
+  el('text', {x: 285, y: 270, 'text-anchor': 'middle', class: 'sv-small'}, svg, 'المايك');
+  // inside view (top-down)
+  el('text', {x: 420, y: 24, class: 'title-svg'}, svg, 'من جوه (من فوق)');
+  el('rect', {x: 420, y: 36, width: 320, height: 240, rx: 6, class: 'sv-fill'}, svg);
+  el('line', {x1: 440, y1: 256, x2: 640, y2: 256, class: 'sv-line', 'stroke-width': 6}, svg);
+  el('text', {x: 540, y: 248, 'text-anchor': 'middle', class: 'sv-small'}, svg, 'الباب (مقفول)');
+  el('rect', {x: 640, y: 196, width: 40, height: 26, rx: 3, class: 'sv-acc'}, svg);
+  el('text', {x: 660, y: 190, 'text-anchor': 'middle', class: 'sv-small'}, svg, 'السيرفو');
+  el('line', {x1: 652, y1: 222, x2: 610, y2: 244, class: 'sv-line', 'stroke-width': 6, style: 'stroke:var(--copper)'}, svg);
+  el('text', {x: 560, y: 226, class: 'sv-txt'}, svg, 'الدراع قافل الباب');
+  el('rect', {x: 600, y: 244, width: 20, height: 10, class: 'sv-cop'}, svg);
+  el('rect', {x: 460, y: 70, width: 160, height: 90, rx: 4, class: 'sv-line'}, svg);
+  el('text', {x: 540, y: 120, 'text-anchor': 'middle', class: 'sv-small'}, svg, 'البريد بورد + ESP32');
+  return svg;
+}
+
+
+function drawBreadboard() {
+  const svg = el('svg', {viewBox: '0 0 780 360', role: 'img', 'aria-label': 'رسمة البريد بورد'});
+  el('rect', {x: 20, y: 20, width: 740, height: 320, rx: 10, class: 'sv-fill'}, svg);
+  const cols = 30, X0 = 70, DX = 22;
+  // rails
+  const rail = (y, k, label) => {
+    el('line', {x1: X0 - 10, x2: X0 + (cols - 1) * DX + 10, y1: y - 9, y2: y - 9, style: `stroke:var(--w-${k});stroke-width:2.5`}, svg);
+    for (let c = 0; c < cols; c++) el('circle', {cx: X0 + c * DX, cy: y, r: 3.2, style: `fill:var(--w-${k})`}, svg);
+    el('text', {x: 40, y: y + 4, 'text-anchor': 'middle', class: 'tag tag-' + (k === 'pos' ? 'pos' : 'neg'), 'font-size': 16}, svg, k === 'pos' ? '+' : '−');
+    el('text', {x: X0 + cols * DX + 4, y: y + 4, class: 'sv-small'}, svg, label);
+  };
+  rail(48, 'pos', 'أحمر +');
+  rail(72, 'neg', 'أزرق −');
+  // holes
+  const ROWY = r => r < 5 ? 108 + r * 18 : 108 + 5 * 18 + 22 + (r - 5) * 18;
+  for (let c = 0; c < cols; c++) for (let r = 0; r < 10; r++)
+    el('circle', {cx: X0 + c * DX, cy: ROWY(r), r: 2.8, class: 'chip-notch', style: 'fill:var(--chip-dim)'}, svg);
+  // gap
+  el('rect', {x: X0 - 10, y: ROWY(4) + 9, width: (cols - 1) * DX + 20, height: 6, rx: 3, style: 'fill:var(--line)'}, svg);
+  el('text', {x: X0 + cols * DX + 4, y: ROWY(4) + 16, class: 'sv-small'}, svg, 'الفاصل');
+  // highlighted column
+  const hc = 3;
+  el('rect', {x: X0 + hc * DX - 8, y: ROWY(0) - 8, width: 16, height: ROWY(4) - ROWY(0) + 16, rx: 8, style: 'fill:none;stroke:var(--w-green);stroke-width:2.5'}, svg);
+  el('text', {x: X0 + hc * DX, y: ROWY(9) + 34, 'text-anchor': 'middle', class: 'sv-txt', style: 'fill:var(--w-green)'}, svg, 'الـ5 دول متوصلين ببعض');
+  el('line', {x1: X0 + hc * DX, x2: X0 + hc * DX, y1: ROWY(4) + 10, y2: ROWY(9) + 20, style: 'stroke:var(--w-green);stroke-dasharray:3 3'}, svg);
+  // chip over the gap
+  const cx0 = X0 + 12 * DX - 6, cw = 8 * DX + 12;
+  el('rect', {x: cx0, y: ROWY(4) - 4, width: cw, height: ROWY(5) - ROWY(4) + 8, rx: 4, class: 'chip'}, svg);
+  el('text', {x: cx0 + cw / 2, y: (ROWY(4) + ROWY(5)) / 2 + 4, 'text-anchor': 'middle', class: 'pinlbl used'}, svg, 'الشريحة');
+  // a wire from a pin column to the red rail
+  const wc = 13;
+  el('path', {d: `M${X0 + wc * DX} ${ROWY(1)} C ${X0 + wc * DX} 80, ${X0 + 20 * DX} 70, ${X0 + 22 * DX} 48`, class: 'wire', style: 'stroke:var(--w-pos)'}, svg);
+  el('circle', {cx: X0 + wc * DX, cy: ROWY(1), r: 5, style: 'fill:var(--w-pos)'}, svg);
+  el('circle', {cx: X0 + 22 * DX, cy: 48, r: 5, style: 'fill:var(--w-pos)'}, svg);
+  el('text', {x: X0 + 23 * DX + 6, y: 100, class: 'sv-txt'}, svg, 'سلك من عمود الرجل للخط الأحمر');
+  return svg;
+}
+
+function render() {
+  const s = STEPS[cur], n = cur + 1;
+  // rail
+  const rail = document.getElementById('rail');
+  rail.innerHTML = '';
+  let phase = '';
+  STEPS.forEach((st, i) => {
+    if (st.phase !== phase) { phase = st.phase; const p = document.createElement('div'); p.className = 'phase'; p.textContent = phase; rail.appendChild(p); }
+    const b = document.createElement('button');
+    b.type = 'button';
+    if (i === cur) b.setAttribute('aria-current', 'step');
+    if (done[i]) b.classList.add('done');
+    b.innerHTML = `<span class="dot">${done[i] ? '✓' : i + 1}</span><span class="nm">${st.name}</span>`;
+    b.title = st.name;
+    b.onclick = () => go(i);
+    rail.appendChild(b);
+  });
+  const count = Object.values(done).filter(Boolean).length;
+  document.getElementById('progress').innerHTML = `خلصت <b>${count}</b> من ${STEPS.length} خطوة`;
+
+  const main = document.getElementById('main');
+  main.innerHTML = '';
+  const card = document.createElement('section');
+  card.className = 'card';
+  card.innerHTML = `<div class="eyebrow">${s.eyebrow}</div><h2>${s.name}</h2><p class="lead">${s.lead}</p>`;
+  const dia = document.createElement('div');
+  dia.className = 'diagram';
+  if (s.parts) {
+    const ul = document.createElement('ul'); ul.className = 'parts'; ul.style.marginTop = '14px';
+    s.parts.forEach(([a, b]) => { const li = document.createElement('li'); li.innerHTML = `<b>${a}</b>${b}`; ul.appendChild(li); });
+    card.appendChild(ul);
+  }
+  dia.appendChild(s.box ? drawBox() : s.bb ? drawBreadboard() : drawCircuit(n));
+  card.appendChild(dia);
+  if (!s.box && !s.bb) {
+    const lg = document.createElement('div'); lg.className = 'legend';
+    lg.innerHTML = `<span><i style="background:var(--copper)"></i>المربع البرتقاني = جديد في الخطوة دي</span><span><i style="background:var(--w-pos)"></i>+ = الخط الأحمر</span><span><i style="background:var(--w-neg)"></i>− = الخط الأزرق</span><span>الخطوط اللي بتتحرك = السلوك اللي هتركبها دلوقتي</span>`;
+    card.appendChild(lg);
+  }
+  main.appendChild(card);
+
+  const card2 = document.createElement('section');
+  card2.className = 'card';
+  const cols = document.createElement('div'); cols.className = 'cols';
+  const left = document.createElement('div');
+  left.innerHTML = `<h3>اعمل كده</h3><ol class="do">${s.do.map(x => `<li>${x}</li>`).join('')}</ol>`;
+  if (s.hex) {
+    const box = document.createElement('div'); box.className = 'hex';
+    const label = s.hex === 'blink' ? 'كود Arduino: تجربة اللمبة' : 'كود Arduino: برنامج الخزنة';
+    const src = document.getElementById(s.hex === 'blink' ? 'hex-blink' : 'hex-safe').value.trim();
+    box.innerHTML = `<b>${label}</b><button class="btn primary" type="button" id="copy-${s.hex}">انسخ الكود</button><textarea id="ta-${s.hex}" readonly aria-label="${label}"></textarea>`;
+    box.querySelector('textarea').value = src;
+    box.querySelector('button').onclick = (e) => {
+      const ta = box.querySelector('textarea');
+      const ok = () => { e.target.textContent = 'اتنسخ'; setTimeout(() => e.target.textContent = 'انسخ الكود', 1500); };
+      try { navigator.clipboard.writeText(src).then(ok, () => { ta.focus(); ta.select(); e.target.textContent = 'دوس Ctrl+C'; }); }
+      catch (err) { ta.focus(); ta.select(); e.target.textContent = 'دوس Ctrl+C'; }
+    };
+    left.appendChild(box);
+  }
+  const right = document.createElement('div');
+  right.innerHTML = `<div class="check"><h3>كده تمام لما…</h3><p>${s.check}</p></div>
+    <details class="fix"><summary>مش شغال؟</summary><ul>${s.fix.map(x => `<li>${x}</li>`).join('')}</ul></details>`;
+  cols.append(left, right);
+  card2.appendChild(cols);
+  main.appendChild(card2);
+
+  const foot = document.createElement('div');
+  foot.className = 'card foot';
+  foot.innerHTML = `<button class="btn ghost" type="button" id="back" ${cur === 0 ? 'disabled' : ''}>→ اللي قبلها</button>
+    <label><input type="checkbox" id="donebox" ${done[cur] ? 'checked' : ''}> الخطوة دي اشتغلت</label>
+    <button class="btn primary" type="button" id="next" ${cur === STEPS.length - 1 ? 'disabled' : ''}>الخطوة اللي بعدها ←</button>`;
+  main.appendChild(foot);
+  foot.querySelector('#back').onclick = () => go(cur - 1);
+  foot.querySelector('#next').onclick = () => { done[cur] = true; save(); go(cur + 1); };
+  foot.querySelector('#donebox').onchange = (e) => { done[cur] = e.target.checked; save(); render(); };
+}
+function save() { try { localStorage.setItem('safe-ar-done', JSON.stringify(done)); localStorage.setItem('safe-ar-step', String(cur)); } catch (e) {} }
+function go(i) { if (i < 0 || i >= STEPS.length) return; cur = i; save(); render(); window.scrollTo({top: 0, behavior: 'smooth'}); }
+render();
+</script>
