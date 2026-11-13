@@ -78,13 +78,11 @@ The [`tools/`](tools/) folder has helper sketches (`check_wiring`, `find_pins`) 
 | 3 claps | Open |
 | `A` (while open) | New password, then `#` |
 
-📄 Full details: [Technical report (PDF)](docs/Smart_Safe_Technical_Report.pdf) · [Arabic build guide](docs/build_guide_ar.html) (download and open in a browser)
+📄 Full details: [Technical report (PDF)](docs/Smart_Safe_Technical_Report.pdf)
 
 ---
 
 <div dir="rtl">
-
-## بالعربي
 
 خزنة إلكترونية متحكم فيها **ATmega32A** ومكتوبة بلغة **C**.
 

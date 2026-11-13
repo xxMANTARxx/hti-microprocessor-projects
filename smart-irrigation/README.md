@@ -62,13 +62,11 @@ Real readings can be added in `ai/my_readings.csv` (`tray_level,tds,temp,humidit
 
 <p align="center"><img src="images/i_phone.png" width="260"> <img src="images/i_phone_alert.png" width="260"></p>
 
-📄 Full details: [Technical report (PDF)](docs/Smart_Irrigation_Technical_Report.pdf) · [Arabic build guide](docs/build_guide_ar.html)
+📄 Full details: [Technical report (PDF)](docs/Smart_Irrigation_Technical_Report.pdf)
 
 ---
 
 <div dir="rtl">
-
-## بالعربي
 
 نظام ري بيشتغل بـ **ESP32**. بيقرر إمتى يسقي الزرعة، و**بيرفض يشغّل المضخة لو المية مالحة**.
 
