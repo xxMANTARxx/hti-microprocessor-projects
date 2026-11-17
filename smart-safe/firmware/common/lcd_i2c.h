@@ -16,17 +16,24 @@ static void twi_init(void) {
     if (TWBR < 2) TWBR = 2;
     TWCR = (1 << TWEN);
 }
-static void twi_start(void) { TWCR = (1<<TWINT)|(1<<TWSTA)|(1<<TWEN); while (!(TWCR & (1<<TWINT))); }
+static uint8_t lcd_dead = 0;   /* 1 = LCD/I2C not answering: skip it so the safe keeps working */
+static void twi_wait(void) {           /* wait for TWI, give up after ~20 ms (stuck or missing LCD) */
+    uint16_t n = 0;
+    while (!(TWCR & (1<<TWINT))) { if (++n > 4000) { TWCR = 0; lcd_dead = 1; return; } }
+}
+static void twi_start(void) { TWCR = (1<<TWINT)|(1<<TWSTA)|(1<<TWEN); twi_wait(); }
 static void twi_stop(void)  { TWCR = (1<<TWINT)|(1<<TWSTO)|(1<<TWEN); }
-static void twi_write(uint8_t d) { TWDR = d; TWCR = (1<<TWINT)|(1<<TWEN); while (!(TWCR & (1<<TWINT))); }
+static void twi_write(uint8_t d) { if (lcd_dead) return; TWDR = d; TWCR = (1<<TWINT)|(1<<TWEN); twi_wait(); }
 static uint8_t twi_probe(uint8_t a) {      /* 1 if a device answers at address a */
+    if (lcd_dead) return 0;
     twi_start(); twi_write(a << 1);
-    uint8_t ok = ((TWSR & 0xF8) == 0x18);
-    twi_stop(); _delay_us(100);
+    uint8_t ok = !lcd_dead && ((TWSR & 0xF8) == 0x18);
+    if (!lcd_dead) twi_stop();
+    _delay_us(100);
     return ok;
 }
 
-static void pcf_write(uint8_t d) { twi_start(); twi_write(LCD_ADDR << 1); twi_write(d | LCD_BL); twi_stop(); }
+static void pcf_write(uint8_t d) { if (lcd_dead) return; twi_start(); twi_write(LCD_ADDR << 1); twi_write(d | LCD_BL); twi_stop(); }
 
 static void lcd_nibble(uint8_t n, uint8_t rs) {
     uint8_t d = (n & 0xF0) | rs;
@@ -48,6 +55,7 @@ static uint8_t lcd_init(void) {          /* returns 1 if the LCD was found */
         if (a == 0x28) a = 0x38;           /* PCF8574: 0x20-0x27, PCF8574A: 0x38-0x3F */
         if (twi_probe(a)) { LCD_ADDR = a; found = 1; }
     }
+    if (!found) { lcd_dead = 1; TWCR = 0; return 0; }   /* no LCD: keypad, claps and servo still work */
     lcd_nibble(0x30, 0); _delay_ms(5);
     lcd_nibble(0x30, 0); _delay_us(150);
     lcd_nibble(0x30, 0);

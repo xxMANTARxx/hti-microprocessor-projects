@@ -11,6 +11,34 @@ An electronic safe built around the **ATmega32A** and written in **bare-metal AV
 
 ![Smart Safe](images/p_safe.jpg)
 
+## 🎙️ New: Voice ID version (speaker voiceprint)
+
+The clap input is replaced by **real speaker verification**: the safe opens only for the **voice of one enrolled owner**.
+
+![Voice ID block diagram](images/v_block.png)
+
+- The **ESP32** creates a Wi-Fi access point `SmartSafe` (password `12345678`) and serves a page at `http://192.168.4.1`.
+- The phone page records 2 s of speech and computes an **MFCC voiceprint** (12 means + 12 standard deviations).
+- **Enrolment:** the owner says the same sentence 3 times; the template and its spread are saved in the ESP32 flash.
+- **Verify:** Euclidean distance to the template; accepted if `d <= factor x spread` (factor 1.8, slider on the page).
+- On a match the ESP32 sends **3 open-drain pulses** to ATmega32A **pin 16 (PD2)** → safe opens "by voice ID". The Lock button sends 2 pulses.
+- Wiring: **ESP32 D26 → ATmega32A pin 16** and **GND → GND**. The sketch pulses D25, D26 and D27 together, so any of them can be used.
+- Android Chrome needs `chrome://flags` → *Insecure origins treated as secure* → `http://192.168.4.1` (microphone access on HTTP).
+
+| File | What it does |
+|---|---|
+| [`esp32-voice-id/voice_id_safe/voice_id_safe.ino`](esp32-voice-id/voice_id_safe/voice_id_safe.ino) | ESP32: Wi-Fi page, MFCC voiceprint (in the browser), enrol / verify, pulses to the safe |
+| [`firmware/smart_safe_voice/smart_safe_voice.c`](firmware/smart_safe_voice/smart_safe_voice.c) | ATmega32A firmware: password + voice ID (PD2 with internal pull-up, 3 pulses open / 2 lock) |
+| [`programmer/flash_safe_voice/flash_safe_voice.ino`](programmer/flash_safe_voice/flash_safe_voice.ino) | ESP32 flasher with the voice firmware inside (2,712 bytes) |
+| [`docs/Smart_Safe_Voice_ID_Report.pdf`](docs/Smart_Safe_Voice_ID_Report.pdf) | Technical report of the voice ID version (IEEE references) |
+
+Steps: flash `flash_safe_voice` into the ATmega32A → upload `voice_id_safe` to the ESP32 → connect D26 + GND → enrol the owner on the phone → speak to open.
+
+![Voice ID flow](images/v_flow.png)
+![Voice ID wiring](images/v_wiring_full.png)
+
+The LCD driver (`firmware/common/lcd_i2c.h`) now has a **timeout on every I2C wait**, so a missing LCD can never freeze the safe (the green LED blinks 10 times fast instead).
+
 ## Hardware
 
 | Signal | ATmega32A pin |

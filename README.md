@@ -5,7 +5,7 @@
 
 | | Project | Brain | Highlights |
 |---|---|---|---|
-| 🔐 | [**Smart Safe**](smart-safe/) | ATmega32A (bare-metal AVR C) | Keypad password **or 3 claps** to open, I2C LCD, servo lock, 30 s lock-out, password in EEPROM, programmed with an **ESP32 as ISP programmer** |
+| 🔐 | [**Smart Safe**](smart-safe/) | ATmega32A (bare-metal AVR C) | Keypad password **or the owner's voice (speaker voiceprint via ESP32)** to open (first version: 3 claps), I2C LCD, servo lock, 30 s lock-out, password in EEPROM, programmed with an **ESP32 as ISP programmer** |
 | 🌱 | [**Smart AI Irrigation**](smart-irrigation/) | ESP32 | Water salinity (TDS), water level, DHT11, LDR → **on-device decision-tree AI** (97.9 % accuracy) decides WAIT / IRRIGATE / ALERT, phone dashboard over Wi-Fi |
 
 ![Both projects on the bench](images/p_both_top.jpg)
@@ -21,6 +21,7 @@ proteus/             Proteus design guide (schematics + simulation)
 ## Reports
 
 - 📄 [Smart Safe – Technical Report (PDF)](smart-safe/docs/Smart_Safe_Technical_Report.pdf)
+- 📄 [Smart Safe Voice ID – Technical Report (PDF)](smart-safe/docs/Smart_Safe_Voice_ID_Report.pdf)
 - 📄 [Smart AI Irrigation – Technical Report (PDF)](smart-irrigation/docs/Smart_Irrigation_Technical_Report.pdf)
 - 📄 [Proteus Design Guide (PDF)](proteus/Proteus_Design_Guide.pdf)
 
@@ -40,7 +41,7 @@ proteus/             Proteus design guide (schematics + simulation)
 
 ده ريبو فيه **مشروعين** عملناهم لمادة *المعالجات الدقيقة والمتحكمات* في **المعهد التكنولوجي العالي بالعاشر من رمضان (HTI)**، قسم الهندسة الكهربية (اتصالات وإلكترونيات).
 
-- 🔐 **[الخزنة الذكية](smart-safe/):** شغالة بـ ATmega32A. بتتفتح بالباسورد من الكيباد **أو بـ 3 تصقيفات**، وبتتقفل بزرار C أو تصقيفتين. فيها شاشة LCD وسيرفو بيقفل، وبتقفل نفسها 30 ثانية بعد 3 مرات غلط، والباسورد بيتحفظ في الـ EEPROM. وحرقنا البرنامج على الشريحة باستخدام **ESP32 كمبرمجة**.
+- 🔐 **[الخزنة الذكية](smart-safe/):** شغالة بـ ATmega32A. بتتفتح بالباسورد من الكيباد **أو ببصمة صوت صاحبها** (النسخة الأولى كانت بـ 3 تصقيفات)، وبتتقفل بزرار C أو تصقيفتين. فيها شاشة LCD وسيرفو بيقفل، وبتقفل نفسها 30 ثانية بعد 3 مرات غلط، والباسورد بيتحفظ في الـ EEPROM. وحرقنا البرنامج على الشريحة باستخدام **ESP32 كمبرمجة**.
 - 🌱 **[الري الذكي بالذكاء الاصطناعي](smart-irrigation/):** شغال بـ ESP32. بيقيس ملوحة المية (TDS)، ومستوى المية، والحرارة والرطوبة (DHT11)، والضوء (LDR). **موديل AI (Decision Tree)** شغال على الـ ESP32 نفسه ودقته 97.9%، وبيقرر: يستنى، أو يسقي، أو يدي تنبيه لو المية مالحة. وكل حاجة بتبان على الموبايل من غير إنترنت.
 
 **الفريق:** أسامة سلامة · محمد خالد عبده · أحمد كامل أحمد — **إشراف:** أ.د.م. محمد طراد
